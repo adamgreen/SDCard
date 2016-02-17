@@ -3,5 +3,5 @@ This project uses submodules (ie. GCC4MBED and CppUTest).  Cloning therefore req
 necessary code.
 
 {{{
-git clone --recursive git@github.com:adamgreen/CrashDebug.git
+git clone --recursive git@github.com:adamgreen/SDCard.git
 }}}
