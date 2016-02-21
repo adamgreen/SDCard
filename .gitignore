@@ -1,4 +1,6 @@
 .DS_Store
+
+# Build Output
 *.bin
 *.disasm
 *.elf
@@ -7,5 +9,19 @@
 *.o
 *.d
 *.a
+
+# GDB Stub Logfiles
 mri.log
 pyocd.log
+
+# Unit Test & Code Coverage Output
+*.gcda
+*.gcno
+*.gcov
+*_tests
+*_tests_gcov
+*_tests.exe
+*_tests_gcov.exe
+*_tests.txt
+*_output.txt
+summary.txt
