@@ -18,6 +18,9 @@
 #include "CppUTest/TestHarness.h"
 
 
+#define HIGH 1
+#define LOW  0
+
 
 TEST_GROUP(SPIDma)
 {
@@ -42,7 +45,7 @@ TEST(SPIDma, WriteOneByte_VerifyItWasRecordedAsOutbound)
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0xFF);
+    spi.send(0xFF);
     STRCMP_EQUAL("FF", spi.getOutboundAsString());
 }
 
@@ -50,8 +53,8 @@ TEST(SPIDma, WriteTwoBytes_VerifyAllAtOnce)
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0x12);
-    spi.write(0x34);
+    spi.send(0x12);
+    spi.send(0x34);
     STRCMP_EQUAL("1234", spi.getOutboundAsString());
 }
 
@@ -59,8 +62,8 @@ TEST(SPIDma, WriteTwoBytes_VerifyOneAtATime)
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0x56);
-    spi.write(0x78);
+    spi.send(0x56);
+    spi.send(0x78);
     STRCMP_EQUAL("56", spi.getOutboundAsString(0, 1));
     STRCMP_EQUAL("78", spi.getOutboundAsString(1, 1));
 }
@@ -69,7 +72,7 @@ TEST(SPIDma, GetOutboundAsStringWithIndexOutOfBounds_ShouldReturnEmptyString)
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0x12);
+    spi.send(0x12);
     STRCMP_EQUAL("", spi.getOutboundAsString(1, 1));
 }
 
@@ -77,7 +80,7 @@ TEST(SPIDma, GetOutboundAsStringWithNegativeIndex_ShouldReturnEmptyString)
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0x12);
+    spi.send(0x12);
     STRCMP_EQUAL("", spi.getOutboundAsString(-1, 1));
 }
 
@@ -200,7 +203,7 @@ TEST(SPIDma, SetFrequencyAfterWritingOneByte_VerifyThatItIsRecordedWithCorrectOf
 {
     SPIDma spi(1, 2, 3);
 
-    spi.write(0xFF);
+    spi.send(0xFF);
     spi.frequency(100000);
 
     LONGS_EQUAL(1, spi.getSettingsCount());
@@ -215,7 +218,7 @@ TEST(SPIDma, SetFrequencyTwice_VerifyBothAreRecorded)
     SPIDma spi(1, 2, 3);
 
     spi.frequency(400000);
-    spi.write(0xFF);
+    spi.send(0xFF);
     spi.frequency(100000);
 
     LONGS_EQUAL(2, spi.getSettingsCount());
@@ -278,7 +281,7 @@ TEST(SPIDma, SetFormatTwice_VerifyTheyBothGetRecorded)
     SPIDma spi(1, 2, 3);
 
     spi.format(16, 2);
-    spi.write(0xFF);
+    spi.send(0xFF);
     spi.format(8);
 
     LONGS_EQUAL(2, spi.getSettingsCount());
@@ -301,7 +304,7 @@ TEST(SPIDma, SetFormatThenFrequencyAndIncreaseFrequencyAfterSendingBytes_VerifyA
 
     spi.format(8, 0);
     spi.frequency(400000);
-    spi.write(0xFF);
+    spi.send(0xFF);
     spi.frequency(25000000);
 
     LONGS_EQUAL(3, spi.getSettingsCount());
@@ -320,4 +323,59 @@ TEST(SPIDma, SetFormatThenFrequencyAndIncreaseFrequencyAfterSendingBytes_VerifyA
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
     LONGS_EQUAL(1, settings.bytesSentBefore);
+}
+
+TEST(SPIDma, SetSelectHighInConstructor_VerifyItGetsRecorded)
+{
+    SPIDma spi(1, 2, 3, 4, HIGH);
+
+    LONGS_EQUAL(1, spi.getSettingsCount());
+    SPIDma::Settings settings = spi.getSetting(0);
+    LONGS_EQUAL(SPIDma::ChipSelect, settings.type);
+    LONGS_EQUAL(HIGH, settings.chipSelect);
+    LONGS_EQUAL(0, settings.bytesSentBefore);
+}
+
+TEST(SPIDma, SetSelectLowInConstructor_VerifyItGetsRecorded)
+{
+    SPIDma spi(1, 2, 3, 4, LOW);
+
+    LONGS_EQUAL(1, spi.getSettingsCount());
+    SPIDma::Settings settings = spi.getSetting(0);
+    LONGS_EQUAL(SPIDma::ChipSelect, settings.type);
+    LONGS_EQUAL(LOW, settings.chipSelect);
+    LONGS_EQUAL(0, settings.bytesSentBefore);
+}
+
+TEST(SPIDma, SetSelectLowAfterWritingAByte_VerifyItGetsRecorded)
+{
+    SPIDma spi(1, 2, 3, 4, HIGH);
+
+    spi.send(0xFF);
+    spi.setChipSelect(LOW);
+
+    LONGS_EQUAL(2, spi.getSettingsCount());
+
+    SPIDma::Settings settings = spi.getSetting(0);
+    LONGS_EQUAL(SPIDma::ChipSelect, settings.type);
+    LONGS_EQUAL(HIGH, settings.chipSelect);
+    LONGS_EQUAL(0, settings.bytesSentBefore);
+
+    settings = spi.getSetting(1);
+    LONGS_EQUAL(SPIDma::ChipSelect, settings.type);
+    LONGS_EQUAL(LOW, settings.chipSelect);
+    LONGS_EQUAL(1, settings.bytesSentBefore);
+}
+
+TEST(SPIDma, IsInboundBufferEmpty)
+{
+    SPIDma spi(1, 2, 3, 4, HIGH);
+
+    CHECK_TRUE(spi.isInboundBufferEmpty());
+        // Place one item in buffer and should now be non-empty.
+        spi.setInboundFromString("FF");
+    CHECK_FALSE(spi.isInboundBufferEmpty());
+        // Read the one item out of buffer and now should be empty again.
+        spi.exchange(0xFF);
+    CHECK_TRUE(spi.isInboundBufferEmpty());
 }

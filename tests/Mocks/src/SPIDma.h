@@ -23,14 +23,16 @@ typedef uint32_t PinName;
 class SPIDma
 {
 public:
-    SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel = 0);
+    SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel = 0, int sselInitVal = 1);
     ~SPIDma();
 
     // Mimic routines that exist in real SPIDma implementation.
     void format(int bits, int mode = 0);
     void frequency(int hz = 1000000);
 
-    void write(int data);
+    void setChipSelect(int state);
+
+    void send(int data);
     int  exchange(int data);
     void transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize);
 
@@ -39,7 +41,8 @@ public:
     enum SettingType
     {
         Frequency = 1,
-        Format
+        Format,
+        ChipSelect
     };
     struct Settings
     {
@@ -48,10 +51,12 @@ public:
         int         frequency;
         int         bits;
         int         mode;
+        int         chipSelect;
     };
 
     const char* getOutboundAsString(int start = 0, int count = -1);
     void        setInboundFromString(const char* pData);
+    bool        isInboundBufferEmpty();
     size_t      getSettingsCount();
     Settings    getSetting(size_t index);
 

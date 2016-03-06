@@ -26,7 +26,7 @@
 #define SETTINGS_GROW 2
 
 
-SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = 0 */)
+SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = 0 */, int sselInitVal /* = 1 */)
 {
     m_pOutBuffer = NULL;
     m_pOutCurr = NULL;
@@ -40,6 +40,10 @@ SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = 0 */)
     m_stringAlloc = 0;
     m_settingsAlloc = 0;
     memset(&m_settings, 0, sizeof(m_settings));
+    if (ssel > 0)
+    {
+        setChipSelect(sselInitVal);
+    }
 }
 
 SPIDma::~SPIDma()
@@ -58,6 +62,15 @@ SPIDma::~SPIDma()
     m_pSettings = NULL;
     m_pSettingsCurr = NULL;
     m_settingsAlloc = 0;
+}
+
+void SPIDma::setChipSelect(int state)
+{
+    m_settings.type = ChipSelect;
+    m_settings.chipSelect = state;
+    m_settings.bytesSentBefore = m_pOutCurr - m_pOutBuffer;
+
+    recordLatestSetting();
 }
 
 void SPIDma::format(int bits, int mode /* = 0 */)
@@ -97,7 +110,7 @@ void SPIDma::frequency(int hz /* = 1000000 */)
     recordLatestSetting();
 }
 
-void SPIDma::write(int data)
+void SPIDma::send(int data)
 {
     int bytesUsed = m_pOutCurr - m_pOutBuffer;
     if ((size_t)bytesUsed >= m_outAlloc)
@@ -118,11 +131,11 @@ void SPIDma::write(int data)
 
 int  SPIDma::exchange(int data)
 {
-    write(data);
+    send(data);
 
     int ret = 0xBD;
-    assert ( m_pInCurr < m_pInBuffer + m_inAlloc );
-    if (m_pInCurr < m_pInBuffer + m_inAlloc)
+    assert ( !isInboundBufferEmpty() );
+    if (!isInboundBufferEmpty())
         ret = *m_pInCurr++;
     return ret;
 }
@@ -144,7 +157,7 @@ void SPIDma::transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_
         }
         else
         {
-            write(*pWrite);
+            send(*pWrite);
         }
         pWrite += writeIncrement;
     }
@@ -233,6 +246,11 @@ uint32_t SPIDma::hexToNibble(char digit)
         ret = digit - 'a' + 10;
 
     return ret;
+}
+
+bool SPIDma::isInboundBufferEmpty()
+{
+    return m_pInCurr >= m_pInBuffer + m_inAlloc;
 }
 
 size_t SPIDma::getSettingsCount()
