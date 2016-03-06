@@ -25,6 +25,10 @@ class CircularLogBase
 public:
     void dump(FILE* pFile);
     void clear();
+    bool isEmpty()
+    {
+        return m_pEnqueue == m_pDequeue;
+    }
 
 protected:
     CircularLogBase()
@@ -41,10 +45,6 @@ protected:
         {
             p = m_pStart;
         }
-    }
-    bool isEmpty()
-    {
-        return m_pEnqueue == m_pDequeue;
     }
     bool doesStringWrapAround()
     {

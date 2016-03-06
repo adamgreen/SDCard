@@ -143,3 +143,27 @@ TEST(CircularLog, LogOneShortEntryAndThenClearLog)
     log.dump(stderr);
     LONGS_EQUAL(0, printfSpy_GetCallCount());
 }
+
+TEST(CircularLog, IsEmptyOnNewLog_ShouldReturnTrue)
+{
+    CircularLog<10,5> log;
+
+    CHECK_TRUE(log.isEmpty());
+}
+
+TEST(CircularLog, IsEmptyOnOneByteInLog_ShouldReturnFalse)
+{
+    CircularLog<10,5> log;
+
+    log.log("\n");
+    CHECK_FALSE(log.isEmpty());
+}
+
+TEST(CircularLog, IsEmptyAfterClear_ShouldReturnTrue)
+{
+    CircularLog<10,5> log;
+
+    log.log("\n");
+    log.clear();
+    CHECK_TRUE(log.isEmpty());
+}
