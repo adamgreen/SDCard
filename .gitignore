@@ -25,3 +25,7 @@ pyocd.log
 *_tests.txt
 *_output.txt
 summary.txt
+
+# Pre-built Binaries
+!/bins/*.bin
+!/bins/*.elf
