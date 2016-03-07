@@ -205,6 +205,15 @@ $(eval $(call make_tests,CIRCULAR_LOG,\
                          $(HOST_MOCKS_LIB)))
 $(eval $(call run_gcov,CIRCULAR_LOG))
 
+#######################################
+# SdFileSystem
+$(eval $(call make_library,SD_FILE_SYSTEM,../SDFileSystem,SDFileSystem.a,../SDFileSystem ../CircularLog Mocks/src))
+$(eval $(call make_tests,SD_FILE_SYSTEM,\
+                         SDFileSystem,\
+                         ../SDFileSystem ../CircularLog SDFileSystem Mocks/src,\
+                         $(HOST_CIRCULAR_LOG_LIB) $(HOST_MOCKS_LIB)))
+$(eval $(call run_gcov,SD_FILE_SYSTEM))
+
 
 
 #######################################
