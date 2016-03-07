@@ -13,6 +13,7 @@
    limitations under the License.
 */
 /* Performance test for file I/O. */
+#include <errno.h>
 #include <mbed.h>
 #include <SDFileSystem.h>
 
@@ -56,8 +57,7 @@ int main()
     checkSdLog();
     if (!pFile)
     {
-        fprintf(stderr, "error: Failed to create %s - ", testFilename);
-        perror(NULL);
+        fprintf(stderr, "error: Failed to create %s - %d\n", testFilename, errno);
         testExit(-1);
     }
     setvbuf(pFile, cache, _IOFBF, sizeof(cache));
@@ -69,8 +69,7 @@ int main()
         checkSdLog();
         if (bytesTransferred != sizeof(buffer))
         {
-            fprintf(stderr, "error: Failed to write to %s - ", testFilename);
-            perror(NULL);
+            fprintf(stderr, "error: Failed to write to %s - %d\n", testFilename, errno);
             break;
         }
     }
@@ -88,8 +87,7 @@ int main()
     checkSdLog();
     if (!pFile)
     {
-        fprintf(stderr, "error: Failed to open %s - ", testFilename);
-        perror(NULL);
+        fprintf(stderr, "error: Failed to open %s - %d\n", testFilename, errno);
         testExit(-1);
     }
     setvbuf(pFile, cache, _IOFBF, sizeof(cache));
@@ -103,8 +101,7 @@ int main()
         {
             if (ferror(pFile))
             {
-                fprintf(stderr, "error: Failed to read from %s - ", testFilename);
-                perror(NULL);
+                fprintf(stderr, "error: Failed to read from %s - %d\n", testFilename, errno);
                 testExit(-1);
             }
             else
@@ -125,7 +122,7 @@ int main()
     checkSdLog();
     if (seekResult)
     {
-        perror("error: Failed to seek to beginning of file");
+        fprintf(stderr, "error: Failed to seek to beginning of file - %d\n", errno);
         testExit(-1);
     }
 
@@ -139,8 +136,7 @@ int main()
         checkSdLog();
         if (bytesTransferred != sizeof(buffer) && ferror(pFile))
         {
-            fprintf(stderr, "error: Failed to read from %s - ", testFilename);
-            perror(NULL);
+            fprintf(stderr, "error: Failed to read from %s - %d\n", testFilename, errno);
             testExit(-1);
         }
 
@@ -149,7 +145,7 @@ int main()
             unsigned char byte = *pCurr++;
             if (byte != 0x55)
             {
-                fprintf(stderr, "error: Unexpected read byte (0x%02X) encountered.", byte);
+                fprintf(stderr, "error: Unexpected read byte (0x%02X) encountered.\n", byte);
                 testExit(-1);
             }
         }
@@ -166,7 +162,7 @@ int main()
     checkSdLog();
     if (removeResult)
     {
-        perror("error: remove() failed");
+        fprintf(stderr, "error: remove() failed - %d\n", errno);
         testExit(-1);
     }
 
