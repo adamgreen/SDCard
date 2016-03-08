@@ -7,6 +7,23 @@ git clone --recursive git@github.com:adamgreen/SDCard.git
 }}}
 
 
+==Overview
+This version of the SD card driver was heavily influenced by these previous versions:
+* [[https://developer.mbed.org/users/neilt6/code/SDFileSystem/file/d10a519c0910/SDFileSystem.cpp]]: Neil Thiessen's
+  updated SDFileSystem driver for mbed.
+* [[http://elm-chan.org/fsw/ff/ffsample.zip]]: The lpc176x sample from ChaN's, the creator of the FatFS driver,
+  ffsample.zip archive of sample code.
+
+===Features
+* **Robustness** - Enables more thorough CRC and error checking and will retry on errors when possible.
+* **Performance** - Supports multi-block read/write operations to increase throughput along with running the SPI
+  communications at 25MHz.
+* **Lower CPU Utilization** - Uses a new SPI driver, SPIDma, created just for this project. With this driver it is able
+  to utilize DMA for the transfer of the 512 byte blocks. While these larger reads/writes are taking place, the CPU can
+  be interrupted to run higher priority tasks with no impact on the I/O operations.
+
+
+
 ==PerformanceTest
 The code in the [[https://github.com/adamgreen/SDCard/tree/master/PerformanceTest | PerformanceTest/ folder]] uses an
 updated SDFileSystem driver to create a 10MB file on the root of a SD card and then reads it.  It displays the measured
