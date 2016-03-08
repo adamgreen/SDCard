@@ -71,7 +71,7 @@ TEST(DiskSectors, DiskSectors_SDv2_ShouldSucceed)
 
     uint8_t csd[16];
     memset(csd, 0x7F, sizeof(csd));
-    uint32_t expectedSectorCount = csd[9] + ((uint32_t)csd[8] << 8) + ((uint32_t)(csd[7] & 63) << 16) + 1;
+    uint32_t expectedSectorCount = (csd[9] + ((uint32_t)csd[8] << 8) + ((uint32_t)(csd[7] & 63) << 16) + 1) << 10;
         LONGS_EQUAL(expectedSectorCount, m_sd.disk_sectors());
 
     validateSelect();

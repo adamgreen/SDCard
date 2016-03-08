@@ -376,7 +376,7 @@ static void dumpCSDv2(uint8_t* pCSD)
     printf("               Write Block Misalignment: %s\n", g_sd.extractBits(pCSD, 16, 78, 78) ? "yes" : "no");
     printf("                Read Block Misalignment: %s\n", g_sd.extractBits(pCSD, 16, 77, 77) ? "yes" : "no");
     printf("                        DSR Implemented: %s\n", g_sd.extractBits(pCSD, 16, 76, 76) ? "yes" : "no");
-    printf("                            Device Size: %llu bytes\n", ((uint64_t)g_sd.extractBits(pCSD, 16, 48, 69) + 1ULL) * 512);
+    printf("                            Device Size: %llu bytes\n", (uint64_t)((g_sd.extractBits(pCSD, 16, 48, 69) + 1) << 10) * 512ULL);
     printf("              Erase Single Block Enable: %s\n", g_sd.extractBits(pCSD, 16, 46, 46) ? "512 bytes" : "SECTOR_SIZE");
     printf("        Erase Sector Size (SECTOR_SIZE): %lu\n", g_sd.extractBits(pCSD, 16, 39, 45) + 1);
     printf("               Write Protect Group Size: %lu\n", g_sd.extractBits(pCSD, 16, 32, 38));

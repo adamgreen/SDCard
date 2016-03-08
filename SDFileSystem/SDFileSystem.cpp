@@ -632,7 +632,7 @@ uint32_t SDFileSystem::disk_sectors()
     {
         // 5.3.3 CSD Register (CSD Version 2.0)
         uint32_t C_SIZE = extractBits(csd, sizeof(csd), 48, 69);
-        return C_SIZE + 1;
+        return (C_SIZE + 1) << 10;
     }
 }
 
