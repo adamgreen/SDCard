@@ -25,11 +25,28 @@
 
 #include "FATFileHandle.h"
 
-FATFileHandle::FATFileHandle(FIL fh) {
+FATFileHandle::FATFileHandle(FIL fh, FATFileHandle** ppHead) {
+    // Add to head of list.
+    FATFileHandle* pNext = *ppHead;
+    if (pNext)
+        pNext->_pPrev = this;
+    _pPrev = NULL;
+    _pNext = pNext;
+    _ppHead = ppHead;
+    *ppHead = this;
+
     _fh = fh;
 }
 
 int FATFileHandle::close() {
+    // Remove handle from linked list.
+    if (_pNext)
+        _pNext->_pPrev = _pPrev;
+    if (_pPrev)
+        _pPrev->_pNext = _pNext;
+    else
+        *_ppHead = _pNext;
+    
     int retval = f_close(&_fh);
     delete this;
     return retval;

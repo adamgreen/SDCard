@@ -44,6 +44,7 @@ FATFileSystem *FATFileSystem::_ffs[_VOLUMES] = {0};
 
 FATFileSystem::FATFileSystem(const char* n) : FileSystemLike(n) {
     debug_if(FFS_DBG, "FATFileSystem(%s)\n", n);
+    _pHead = NULL;
     for(int i=0; i<_VOLUMES; i++) {
         if(_ffs[i] == 0) {
             _ffs[i] = this;
@@ -97,7 +98,7 @@ FileHandle *FATFileSystem::open(const char* name, int flags) {
     if (flags & O_APPEND) {
         f_lseek(&fh, fh.fsize);
     }
-    return new FATFileHandle(fh);
+    return new FATFileHandle(fh, &this->_pHead);
 }
 
 int FATFileSystem::remove(const char *filename) {
@@ -151,4 +152,18 @@ int FATFileSystem::unmount() {
         return -1;
     FRESULT res = f_mount(NULL, _fsid, 0);
     return res == 0 ? 0 : -1;
+}
+
+int FATFileSystem::fflush() {
+    FATFileHandle* pCurr = _pHead;
+    int result = 0;
+
+    while (pCurr)
+    {
+        if (pCurr->fsync())
+            result = -1;
+        pCurr = pCurr->_pNext;
+    }
+
+    return result;
 }

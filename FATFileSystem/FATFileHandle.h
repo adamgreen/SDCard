@@ -23,13 +23,14 @@
 #define MBED_FATFILEHANDLE_H
 
 #include "FileHandle.h"
+#include "ff.h"
 
 using namespace mbed;
 
 class FATFileHandle : public FileHandle {
 public:
 
-    FATFileHandle(FIL fh);
+    FATFileHandle(FIL fh, class FATFileHandle** ppHead);
     virtual int close();
     virtual ssize_t write(const void* buffer, size_t length);
     virtual ssize_t read(void* buffer, size_t length);
@@ -39,8 +40,12 @@ public:
     virtual off_t flen();
 
 protected:
-
-    FIL _fh;
+    friend class FATFileSystem;
+    
+    FATFileHandle*  _pNext;
+    FATFileHandle*  _pPrev;
+    FATFileHandle** _ppHead;
+    FIL             _fh;
 
 };
 

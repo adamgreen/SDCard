@@ -23,7 +23,7 @@
 #define MBED_FATFILESYSTEM_H
 
 #include "FileSystemLike.h"
-#include "FileHandle.h"
+#include "FATFileHandle.h"
 #include "ff.h"
 #include <stdint.h>
 
@@ -82,6 +82,11 @@ public:
      */
     virtual int unmount();
 
+    /**
+     * Flush all open files to storage media
+     */
+    virtual int fflush();
+
     virtual int disk_initialize() { return 0; }
     virtual int disk_status() { return 0; }
     virtual int disk_read(uint8_t *buffer, uint32_t sector, uint32_t count) = 0;
@@ -89,6 +94,8 @@ public:
     virtual int disk_sync() { return 0; }
     virtual uint32_t disk_sectors() = 0;
 
+protected:
+    FATFileHandle*  _pHead;
 };
 
 #endif
