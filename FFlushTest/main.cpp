@@ -29,12 +29,12 @@ int main()
     fwrite(data2, 1, sizeof(data2)-1, pFile2);
 
     fflush(NULL);
-    g_sd.fflush();
+    g_sd.sync();
 
     fclose(pFile2);
-    g_sd.fflush();
+    g_sd.sync();
     fclose(pFile1);
-    g_sd.fflush();
+    g_sd.sync();
 
 
     // Do the same operations again but close the files in the opposite order.
@@ -44,10 +44,10 @@ int main()
     fwrite(data2, 1, sizeof(data2)-1, pFile2);
 
     fflush(NULL);
-    g_sd.fflush();
+    g_sd.sync();
 
     fclose(pFile1);
-    g_sd.fflush();
+    g_sd.sync();
     fclose(pFile2);
-    g_sd.fflush();
+    g_sd.sync();
 }

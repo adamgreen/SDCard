@@ -83,9 +83,9 @@ public:
     virtual int unmount();
 
     /**
-     * Flush all open files to storage media
+     * Sync all file data to storage media
      */
-    virtual int fflush();
+    virtual int sync();
 
     virtual int disk_initialize() { return 0; }
     virtual int disk_status() { return 0; }

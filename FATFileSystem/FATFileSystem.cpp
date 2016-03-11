@@ -154,7 +154,7 @@ int FATFileSystem::unmount() {
     return res == 0 ? 0 : -1;
 }
 
-int FATFileSystem::fflush() {
+int FATFileSystem::sync() {
     FATFileHandle* pCurr = _pHead;
     int result = 0;
 
