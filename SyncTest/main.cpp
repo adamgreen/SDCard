@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-/* Exercise my FATFileSystem::fflush() code. */
+/* Exercise my FATFileSystem::sync() code. */
 #include <mbed.h>
 #include <SDFileSystem.h>
 
