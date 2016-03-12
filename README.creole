@@ -140,3 +140,65 @@ SD Card Driver Counters
     cmd12PaddingByteRequiredCount = 1252
 Test Completed!
 }}}
+
+
+
+==PerformanceTest Results
+===Throughput Measurements
+|= Card                                   |= Manufacturing Date |= Write Speed (MB/s) |= Read Speed (MB/s) |
+| SanDisk Ultra 32GB microSD HC I Class 1 | December 2012       | 1.61                | 1.68               |
+| SanDisk Mobile Ultra 16GB MicroSD HC I  | November 2011       | 1.74                | 1.64               |
+| ADATA 8GB microSDHC Card Speed Class 4  | February 2015       | 1.54                | 1.67               |
+| SanDisk 2GB MicroSD - SDSC              | August 2007         | 1.19                | 1.10               |
+| Wolfman #1 - PH 4 GB                    | January 2014        | 0.85                | 1.64               |
+| Wolfman #2 - TM 8 GB                    | April 2015          | 1.60                | 1.55               |
+| SanDisk 4GB                             | March 2014          | 1.77                | 1.64               |
+| Adata 8GB                               | February 2015       | 1.74                | 1.66               |
+| Kingston 2GB                            | September 2008      | 1.59                | 1.64               |
+| Sandisk 1GB                             | January 2007        | 1.76                | 1.64               |
+
+===Extra SPI Exchanges
+There were some places in ChaN's code which performed an extra SPI byte transfer in the select() code path and after
+issuing a CMD12 command. I didn't see anything in the SD specification which called these out explicitly so I kept them
+in my version and added instrumentation to count when they most likely were required. The following table shows those
+counts. Based on these results it looks like they are most likely required and I can now remove the instrumentation.
+
+|= Card                                   |= selectFirstExchangeRequiredCount |= cmd12PaddingByteRequiredCount |
+| SanDisk Ultra 32GB microSD HC I Class 1 | 1004                              | 1004                           |
+| SanDisk Mobile Ultra 16GB MicroSD HC I  | 1280                              | 1280                           |
+| ADATA 8GB microSDHC Card Speed Class 4  |                                   | 1252                           |
+| SanDisk 2GB MicroSD - SDSC              | 5120                              | 5120                           |
+| Wolfman #1 - PH 4 GB                    | 1134                              | 1134                           |
+| Wolfman #2 - TM 8 GB                    | 1278                              | 1278                           |
+| SanDisk 4GB                             | 1280                              | 1280                           |
+| Adata 8GB                               |                                   | 1246                           |
+| Kingston 2GB                            |                                   | 1278                           |
+| Sandisk 1GB                             | 1280                              | 1280                           |
+
+===Wait Times
+There are some places that the code loops waiting for the card to respond. The following table shows that the cards
+tested are way within the limits used by the current code:\\
+**waitWhileBusyTime:** 500ms\\
+**R1 Response:** 10 iterations\\
+**ACMD41 Wait Time:** 1000ms\\
+**ReceiveDataBlockWaitTime:** 500ms\\
+
+|= Card                                   |= waitWhileBusyTime (ms) |= R1ResponseLoopCount |= ACMD41WaitTime (ms) |= ReceiveDataBlockWaitTime (ms) |
+| SanDisk Ultra 32GB microSD HC I Class 1 | 14                      | 2                    | 5                    |                                |
+| SanDisk Mobile Ultra 16GB MicroSD HC I  | 93                      | 2                    | 15                   | 2                              |
+| ADATA 8GB microSDHC Card Speed Class 4  | 96                      | 1                    | 1                    | 1                              |
+| SanDisk 2GB MicroSD - SDSC              | 21                      | 2                    | 3                    | 1                              |
+| Wolfman #1 - PH 4 GB                    | 145                     | 1                    | 1                    |                                |
+| Wolfman #2 - TM 8 GB                    | 33                      | 2                    | 22                   | 2                              |
+| SanDisk 4GB                             | 54                      | 2                    | 22                   |                                |
+| Adata 8GB                               | 15                      | 1                    | 1                    | 1                              |
+| Kingston 2GB                            | 174                     | 2                    | 62                   |                                |
+| Sandisk 1GB                             | 76                      | 2                    | 3                    | 1                              |
+
+===Retries
+There is code in the driver to retry in certain failure scenarios:
+* CRC errors on sent commands
+* Errors when reading block data
+* Errors when writing block data
+
+The counters for all of these retries was 0 on the cards tested so far.
