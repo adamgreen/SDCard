@@ -411,11 +411,13 @@ static void dumpSdCounters()
 
     printf("SD Card Driver Counters\n");
 
+    DUMP_COUNTER(selectFirstExchangeRequiredCount, 0);
     DUMP_COUNTER(maximumWaitWhileBusyTime, 0);
     DUMP_COUNTER(maximumWaitForR1ResponseLoopCount, 0);
     DUMP_COUNTER(maximumCRCRetryCount, 0);
     DUMP_COUNTER(maximumACMD41LoopTime, 0);
     DUMP_COUNTER(maximumReceiveDataBlockWaitTime, 0);
     DUMP_COUNTER(maximumReadRetryCount, 0);
+    DUMP_COUNTER(cmd12PaddingByteRequiredCount, 0);
     DUMP_COUNTER(maximumWriteRetryCount, 0);
 }

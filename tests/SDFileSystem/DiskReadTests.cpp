@@ -565,6 +565,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FromSDHC_ShouldSucceed)
     LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
     // Should have had to make no read retries.
     LONGS_EQUAL(0, m_sd.maximumReadRetryCount());
+    // Should have seen no CMD12 padding bytes that actually needed to be discarded.
+    LONGS_EQUAL(0, m_sd.cmd12PaddingByteRequiredCount());
 }
 
 TEST(DiskRead, DiskRead_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
@@ -615,6 +617,52 @@ TEST(DiskRead, DiskRead_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
              "disk_read(%X,42,2) - Select timed out\n",
              (uint32_t)(size_t)buffer);
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
+
+TEST(DiskRead, DiskRead_MultiBlock_ForceCmd12PaddingByteToContainStartBit_ShouldSucceed_ShouldBeCounted)
+{
+    uint8_t buffer[1024];
+
+    initSDHC();
+    // CMD18 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xDA + valid CRC.
+    setupDataBlock(0xDA, 512);
+    // CMD12 input data.
+    // Queue up bytes required for select() from within CMD12.
+    m_sd.spi().setInboundFromString("00FF");
+    // Queue up padding byte with start bit cleared.
+    m_sd.spi().setInboundFromString("7F00");
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 42, 2));
+
+    validateSelect();
+    // Should send CMD18 to start read process.  Argument is block number.
+    validateCmdPacket(18, 42);
+    // Should send multiple FF bytes to read in each data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(2*(1+512+2));
+    // Should send CMD12 to stop read process.
+    validateDeselect();
+    validateCmd(12);
+
+    // Should have read in data via SPI.
+    validateBuffer(buffer, 512, 0xAD);
+    validateBuffer(buffer + 512, 512, 0xDA);
+
+    // Should count a padding read that was required for CMD12.
+    LONGS_EQUAL(1, m_sd.cmd12PaddingByteRequiredCount());
 }
 
 TEST(DiskRead, DiskRead_MultiBlock_CMD18Error_ShouldFail_GetLogged)

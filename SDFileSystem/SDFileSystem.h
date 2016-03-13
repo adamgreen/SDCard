@@ -68,6 +68,11 @@ public:
         m_log.clear();
     }
 
+    // Count how many times the first SPI exchange in select() was actually required.
+    uint32_t selectFirstExchangeRequiredCount()
+    {
+        return m_selectFirstExchangeRequiredCount;
+    }
     // The maximum amount of time waitWhileBusy() loops waiting for device to not be busy writing.
     uint32_t maximumWaitWhileBusyTime()
     {
@@ -102,6 +107,11 @@ public:
     {
         return m_maximumReadRetryCount;
     }
+    // Count how many times the extra SPI exchange for CMD12 was probably required.
+    uint32_t cmd12PaddingByteRequiredCount()
+    {
+        return m_cmd12PaddingByteRequiredCount;
+    }
     // The maximum number of write retries for a single block because of transmitDataBlock() failure.
     // Possible causes:
     //  Timed out waiting for card to exit busy state.
@@ -130,12 +140,14 @@ protected:
     uint32_t               m_blockToAddressShift;
 
     CircularLog<1024, 256> m_log;                                   // Diagnostic
+    uint32_t               m_selectFirstExchangeRequiredCount;      // Diagnostic
     uint32_t               m_maximumWaitWhileBusyTime;              // Diagnostic
     uint32_t               m_maximumWaitForR1ResponseLoopCount;     // Diagnostic
     uint32_t               m_maximumCRCRetryCount;                  // Diagnostic
     uint32_t               m_maximumACMD41LoopTime;                 // Diagnostic
     uint32_t               m_maximumReceiveDataBlockWaitTime;       // Diagnostic
     uint32_t               m_maximumReadRetryCount;                 // Diagnostic
+    uint32_t               m_cmd12PaddingByteRequiredCount;         // Diagnostic
     uint32_t               m_maximumWriteRetryCount;                // Diagnostic
 };
 

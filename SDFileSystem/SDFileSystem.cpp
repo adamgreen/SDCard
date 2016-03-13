@@ -126,12 +126,14 @@ SDFileSystem::SDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs,
     m_timerOuter.start();
 
     // Initialize Diagnostic Fields.
+    m_selectFirstExchangeRequiredCount = 0;
     m_maximumWaitWhileBusyTime = 0;
     m_maximumWaitForR1ResponseLoopCount = 0;
     m_maximumCRCRetryCount = 0;
     m_maximumACMD41LoopTime = 0;
     m_maximumReceiveDataBlockWaitTime = 0;
     m_maximumReadRetryCount = 0;
+    m_cmd12PaddingByteRequiredCount = 0;
     m_maximumWriteRetryCount = 0;
 
     m_spi.format(8, polarity0phase0);
@@ -750,7 +752,14 @@ bool SDFileSystem::select()
     m_spi.setChipSelect(LOW);
 
     // Send 0xFF to prime card for next command.
-    m_spi.exchange(0xFF);
+    // I want to know if this exchange is necessary or if it could have just gone straight to waitWhileBusy().
+    // The only reason it would be needed is if it would read 0xFF (which doesn't require wait) but the next read
+    // returns !0xFF (which does require wait).
+    uint8_t response = m_spi.exchange(0xFF);
+    if (response == 0xFF && m_spi.exchange(0xFF) != 0xFF)
+    {
+        m_selectFirstExchangeRequiredCount++;
+    }
 
     // Wait for card to exit busy state.
     if (!waitWhileBusy(500))
@@ -852,9 +861,14 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
         }
 
         // Discard extra byte after CMD12.
+        // Is this really required?  Would probably be required if this padding byte had start bit cleared.
         if (cmd == 12)
         {
             r1Response = m_spi.exchange(0xFF);
+            if (0 == (r1Response & R1_START_BIT))
+            {
+                m_cmd12PaddingByteRequiredCount++;
+            }
         }
 
         // 7.3.2.1 Format R1 - The R1 response should have the high (start) bit clear.  Loop until such a response is
