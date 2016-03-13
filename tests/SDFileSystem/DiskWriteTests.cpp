@@ -16,6 +16,17 @@
 
 TEST_GROUP_BASE(DiskWrite,SDFileSystemBase)
 {
+    void setupDataForCmd12(const char* pR1Response = "01" /* No errors & in idle state */)
+    {
+        // select() expects to receive a response which is not 0xFF for the first byte read.
+        m_sd.spi().setInboundFromString("00");
+        // Return not-busy on first loop in waitForNotBusy().
+        m_sd.spi().setInboundFromString("FF");
+        // Return extra padding byte.
+        m_sd.spi().setInboundFromString("FF");
+        // Return indicated R1 response.
+        m_sd.spi().setInboundFromString(pR1Response);
+    }
 };
 
 

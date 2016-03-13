@@ -16,6 +16,13 @@
 
 TEST_GROUP_BASE(DiskRead,SDFileSystemBase)
 {
+    void setupDataForCmd12(const char* pR1Response = "01" /* No errors & in idle state */)
+    {
+        // Return extra padding byte.
+        m_sd.spi().setInboundFromString("FF");
+        // Return indicated R1 response.
+        m_sd.spi().setInboundFromString(pR1Response);
+    }
 };
 
 
@@ -554,8 +561,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FromSDHC_ShouldSucceed)
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Should have read in data via SPI.
     validateBuffer(buffer, 512, 0xAD);
@@ -619,7 +626,7 @@ TEST(DiskRead, DiskRead_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
 }
 
-TEST(DiskRead, DiskRead_MultiBlock_ForceCmd12PaddingByteToContainStartBit_ShouldSucceed_ShouldBeCounted)
+TEST(DiskRead, DiskRead_MultiBlock_ForceCmd12PaddingByteToContainStartBitAndErrorCode_ShouldSucceed_ShouldBeCounted)
 {
     uint8_t buffer[1024];
 
@@ -635,8 +642,6 @@ TEST(DiskRead, DiskRead_MultiBlock_ForceCmd12PaddingByteToContainStartBit_Should
     // Data block will contain 512 bytes of 0xDA + valid CRC.
     setupDataBlock(0xDA, 512);
     // CMD12 input data.
-    // Queue up bytes required for select() from within CMD12.
-    m_sd.spi().setInboundFromString("00FF");
     // Queue up padding byte with start bit cleared.
     m_sd.spi().setInboundFromString("7F00");
 
@@ -654,8 +659,8 @@ TEST(DiskRead, DiskRead_MultiBlock_ForceCmd12PaddingByteToContainStartBit_Should
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Should have read in data via SPI.
     validateBuffer(buffer, 512, 0xAD);
@@ -727,8 +732,8 @@ TEST(DiskRead, DiskRead_MultiBlock_CMD12Error_ShouldFail_GetLogged)
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Should have read in data via SPI by the time the error was encountered.
     validateBuffer(buffer, 512, 0xAD);
@@ -828,8 +833,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
     //  2 to read CRC.
     validateFFBytes(1*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Retry from failure of first block.
     // Failed read of second block.
@@ -842,8 +847,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Retry from failure of second block.
     // Failed read of third block.
@@ -856,8 +861,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Retry from failure of third block.
     // Failed read of fourth block.
@@ -870,8 +875,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
     //  2 to read CRC.
     validateFFBytes(2*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Retry from failure of last block.
     validateSelect();
@@ -883,8 +888,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
     //  2 to read CRC.
     validateFFBytes(1*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Should have read in data via SPI.
     validateBuffer(buffer, 512, 0x11);
@@ -961,8 +966,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Shoul
     //  2 to read CRC.
     validateFFBytes(1*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
     // Start next attempt.
     validateSelect();
     // Should send CMD18 to start read process.  Argument is block number.
@@ -973,8 +978,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Shoul
     //  2 to read CRC.
     validateFFBytes(1*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
     // Start next attempt.
     validateSelect();
     // Should send CMD18 to start read process.  Argument is block number.
@@ -985,8 +990,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Shoul
     //  2 to read CRC.
     validateFFBytes(1*(1+512+2));
     // Should send CMD12 to stop read process.
+    validateCmdPacket(12);
     validateDeselect();
-    validateCmd(12);
 
     // Will have read in data to first block before encountering CRC error.
     validateBuffer(buffer, 512, 0xAD);

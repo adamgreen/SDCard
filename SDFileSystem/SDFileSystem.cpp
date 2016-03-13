@@ -383,11 +383,9 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
             count--;
         }
 
-        // Deselect card before sending next CMD12 command.
+        // CMD12 is sent to stop the multi-block read and then deselect() at end of multi-block read, error or not.
+        r1Response = sendCommandAndGetResponse(CMD12);
         deselect();
-
-        // CMD12 is sent to stop the multi-block read.
-        r1Response = cmd(CMD12);
         if (r1Response != 0)
         {
             m_log.log("disk_read(%X,%d,%d) - CMD12 returned 0x%02X\n",
@@ -865,7 +863,7 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
         if (cmd == 12)
         {
             r1Response = m_spi.exchange(0xFF);
-            if (0 == (r1Response & R1_START_BIT))
+            if (0 == (r1Response & R1_START_BIT) && (r1Response & R1_ERRORS_MASK))
             {
                 m_cmd12PaddingByteRequiredCount++;
             }

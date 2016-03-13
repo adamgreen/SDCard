@@ -130,18 +130,6 @@ protected:
         setupDataForCmd(pR1Response);
     }
 
-    void setupDataForCmd12(const char* pR1Response = "01" /* No errors & in idle state */)
-    {
-        // select() expects to receive a response which is not 0xFF for the first byte read.
-        m_sd.spi().setInboundFromString("00");
-        // Return not-busy on first loop in waitForNotBusy().
-        m_sd.spi().setInboundFromString("FF");
-        // Return extra padding byte.
-        m_sd.spi().setInboundFromString("FF");
-        // Return indicated R1 response.
-        m_sd.spi().setInboundFromString(pR1Response);
-    }
-
     void validate400kHzClockAnd80PrimingClockEdges()
     {
         // Should set frequency and chip select settings at beginning on init process.
