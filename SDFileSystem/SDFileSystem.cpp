@@ -122,8 +122,7 @@ SDFileSystem::SDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs,
 
     m_status = STA_NOINIT;
     m_blockToAddressShift = 0;
-    m_timer.start();
-    m_timerOuter.start();
+    m_spiBytesPerSecond = 0;
 
     // Initialize Diagnostic Fields.
     m_selectFirstExchangeRequiredCount = 0;
@@ -146,7 +145,7 @@ int SDFileSystem::disk_initialize()
     bool isSDv2 = false;
 
     // 4.2.1 Card Reset - Initializes to accept 400kHz clock rate in idle state.
-    m_spi.frequency(400000);
+    setCurrentFrequency(400000);
 
     // 6.4.1.1 Power Up Time of Card - Send 8 * 10 >= 74 clocks during power-up.
     m_spi.setChipSelect(HIGH);
@@ -222,14 +221,16 @@ int SDFileSystem::disk_initialize()
     // Issue ACMD41 to start the initialization process.  Keep issuing this command until the card leaves the
     // idle state.  For SDv2, set the HCS bit to indicate that this host supports high capacity cards.
     // Keep attempting for up to a maximum of 1 second.
-    uint32_t elapsedTime = 0;
-    m_timerOuter.reset();
+    uint32_t byteCount;
+    m_spi.resetByteCount();
     do
     {
         r1Response = cmd(ACMD41, isSDv2 ? ACMD41_HCS_BIT : 0);
-        elapsedTime = m_timerOuter.read_ms();
-    } while (r1Response == R1_IDLE && elapsedTime < 1000);
+        byteCount = m_spi.getByteCount();
+    } while (r1Response == R1_IDLE && byteCount < m_spiBytesPerSecond);
+
     // Record longest time it has taken to leave idle state.
+    uint32_t elapsedTime = (byteCount * 1000) / m_spiBytesPerSecond;
     if (elapsedTime > m_maximumACMD41LoopTime)
     {
         m_maximumACMD41LoopTime = elapsedTime;
@@ -289,7 +290,7 @@ int SDFileSystem::disk_initialize()
     }
 
     // 2. System Features - Default speed mode (slowest) is 25MHz.
-    m_spi.frequency(25000000);
+    setCurrentFrequency(25000000);
 
     // Mark that the driver is now initialized.
     m_status &= ~STA_NOINIT;
@@ -710,6 +711,14 @@ uint32_t SDFileSystem::extractBits(const uint8_t* p, size_t size, uint32_t lowBi
 
 
 
+void SDFileSystem::setCurrentFrequency(uint32_t spiFrequency)
+{
+    // It takes 8 spi clock cycles per byte exchanged.
+    m_spiBytesPerSecond = spiFrequency / 8;
+
+    m_spi.frequency(spiFrequency);
+}
+
 uint8_t SDFileSystem::cmd(uint8_t cmd, uint32_t argument /* = 0 */, uint32_t* pResponse /* = NULL */)
 {
     // 7.2 SPI Bus Protocol - Need to assert chip select low before writing the command out over SPI.
@@ -760,7 +769,7 @@ bool SDFileSystem::select()
     }
 
     // Wait for card to exit busy state.
-    if (!waitWhileBusy(500))
+    if (!waitWhileBusy(m_spiBytesPerSecond / 2))
     {
         // Card never left busy state after 500 msecs.
         m_log.log("select() - 500 msec time out\n");
@@ -771,20 +780,20 @@ bool SDFileSystem::select()
     return true;
 }
 
-bool SDFileSystem::waitWhileBusy(uint32_t msecTimeout)
+bool SDFileSystem::waitWhileBusy(uint32_t maxSpiExchanges)
 {
     // 7.2.4 Data Write - Card will keep MISO asserted low while it is busy. Will receive 0xFF once it is no longer
     //                    in busy state.
-    uint32_t elapsedTime = 0;
+    uint32_t iteration = 0;
     uint8_t  response;
-    m_timer.reset();
     do
     {
         response = m_spi.exchange(0xFF);
-        elapsedTime = m_timer.read_ms();
-    } while (response != 0xFF && elapsedTime < msecTimeout);
+        iteration++;
+    } while (response != 0xFF && iteration < maxSpiExchanges);
 
     // Record the maximum wait time.
+    uint32_t elapsedTime = (iteration * 1000) / m_spiBytesPerSecond;
     if (elapsedTime >  m_maximumWaitWhileBusyTime)
     {
         m_maximumWaitWhileBusyTime = elapsedTime;
@@ -793,7 +802,7 @@ bool SDFileSystem::waitWhileBusy(uint32_t msecTimeout)
     // Response won't be 0xFF if we timed out.
     if (response != 0xFF)
     {
-        m_log.log("waitWhileBusy(%u) - Time out. Response=0x%02X\n", msecTimeout, response);
+        m_log.log("waitWhileBusy(%u) - Time out. Response=0x%02X\n", maxSpiExchanges, response);
         return false;
     }
 
@@ -985,16 +994,16 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     // 4.3.3 Data Read - Keeps the DAT bus lines pulled high when not transmitting data.
     // 4.6.2.1 Read - 100ms as the minimum read timeout.
     // Wait up to 500msec until something other than 0xFF is encountered.
-    uint32_t elapsedTime = 0;
-    uint8_t byte;
-    m_timer.reset();
+    uint32_t iteration = 0;
+    uint8_t  byte;
     do
     {
         byte = m_spi.exchange(0xFF);
-        elapsedTime = m_timer.read_ms();
-    } while (byte == 0xFF && elapsedTime < 500);
+        iteration++;
+    } while (byte == 0xFF && iteration < m_spiBytesPerSecond / 2);
 
     // Record maximum amount of wait time.
+    uint32_t elapsedTime = (iteration * 1000) / m_spiBytesPerSecond;
     if (elapsedTime > m_maximumReceiveDataBlockWaitTime)
     {
         m_maximumReceiveDataBlockWaitTime = elapsedTime;
@@ -1038,7 +1047,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
 {
     // 7.2.4 Data Write - Overview of write process. If there was a previous data block write then we must wait for
     //                    the chip to no longer be busy.
-    if (!waitWhileBusy(500))
+    if (!waitWhileBusy(m_spiBytesPerSecond / 2))
     {
         m_log.log("transmitDataBlock(%X,%X,%d) - Time out after 500ms\n", blockToken, pBuffer, bufferSize);
         return DATA_RESPONSE_UNKNOWN_ERROR;

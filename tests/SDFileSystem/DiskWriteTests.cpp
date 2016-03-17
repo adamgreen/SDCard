@@ -144,8 +144,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_SelectTimeout_ShouldFail_GetLogged)
     // Return busy on two loops through waitForNotBusy().
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Fill the write buffer with data to write.
     memset(buffer, 0xAD, sizeof(buffer));
@@ -173,7 +173,7 @@ TEST(DiskWrite, DiskWrite_SingleBlock_SelectTimeout_ShouldFail_GetLogged)
     m_sd.dumpErrorLog(stderr);
     char expectedOutput[256];
     snprintf(expectedOutput, sizeof(expectedOutput),
-             "waitWhileBusy(500) - Time out. Response=0x00\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
              "select() - 500 msec time out\n"
              "disk_write(%X,42,1) - Select timed out\n",
              (uint32_t)(size_t)buffer);
@@ -228,8 +228,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceWaitWhileBusyToTimeout_ShouldRetry_Lo
     setupDataForCmd("00");
     m_sd.spi().setInboundFromString("00");
 
-    // Bump elapsed time so that two loops should lead to timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Fill the write buffer with data to write.
     memset(buffer, 0xAD, sizeof(buffer));
@@ -267,7 +267,7 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceWaitWhileBusyToTimeout_ShouldRetry_Lo
     m_sd.dumpErrorLog(stderr);
     char expectedOutput[256];
     snprintf(expectedOutput, sizeof(expectedOutput),
-             "waitWhileBusy(500) - Time out. Response=0x00\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
              "transmitDataBlock(FE,%08X,512) - Time out after 500ms\n"
              "disk_write(%X,42,1) - transmitDataBlock failed\n",
              (uint32_t)(size_t)buffer,
@@ -730,8 +730,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
     // Return busy on two loops through waitForNotBusy().
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Fill the write buffer with data to write.
     memset(buffer, 0xAD, 512);
@@ -762,7 +762,7 @@ TEST(DiskWrite, DiskWrite_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
     m_sd.dumpErrorLog(stderr);
     char expectedOutput[256];
     snprintf(expectedOutput, sizeof(expectedOutput),
-             "waitWhileBusy(500) - Time out. Response=0x00\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
              "select() - 500 msec time out\n"
              "disk_write(%X,42,2) - Select timed out\n",
              (uint32_t)(size_t)buffer);

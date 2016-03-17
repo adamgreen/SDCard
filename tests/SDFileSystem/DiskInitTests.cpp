@@ -73,20 +73,23 @@ TEST(DiskInit, DiskInit_SuccessfulSDHC)
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // Verify no longer in NOINIT state.
     LONGS_EQUAL(0, m_sd.disk_status());
     // Verify that card was detected as high capacity where block addresses are SD read/write address.
     LONGS_EQUAL(0, m_sd.blockToAddressShift());
     // No non-zero value returned in first select() SPI exchange should be recorded.
     LONGS_EQUAL(0, m_sd.selectFirstExchangeRequiredCount());
-    // Should only loop once watiing for card to not be busy during select().
-    LONGS_EQUAL(1, m_sd.maximumWaitWhileBusyTime());
+    // Should only loop once waiting for card to not be busy during select().
+    LONGS_EQUAL(0, m_sd.maximumWaitWhileBusyTime());
     // Shouldn't have to loop for a valid R1 response.
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Shouldn't have had to loop for bad CRC.
     LONGS_EQUAL(0, m_sd.maximumCRCRetryCount());
     // Maximum elapsed time for ACMD41 to leave idle state should be short.
-    LONGS_EQUAL(1, m_sd.maximumACMD41LoopTime());
+    LONGS_EQUAL(0, m_sd.maximumACMD41LoopTime());
     // Maximum elapsed time for receiveDataBlock() should init to 0.
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Maximum read retry count should init to 0.
@@ -146,6 +149,9 @@ TEST(DiskInit, DiskInit_SuccessfulSDSCv2)
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // Verify no longer in NOINIT state.
     LONGS_EQUAL(0, m_sd.disk_status());
     // Verify that card was detected as low capacity where block addresses need to be converted to 512 bytes per
@@ -153,14 +159,14 @@ TEST(DiskInit, DiskInit_SuccessfulSDSCv2)
     LONGS_EQUAL(9, m_sd.blockToAddressShift());
     // No non-zero value returned in first select() SPI exchange should be recorded.
     LONGS_EQUAL(0, m_sd.selectFirstExchangeRequiredCount());
-    // Should only loop once watiing for card to not be busy during select().
-    LONGS_EQUAL(1, m_sd.maximumWaitWhileBusyTime());
+    // Should only loop once waiting for card to not be busy during select().
+    LONGS_EQUAL(0, m_sd.maximumWaitWhileBusyTime());
     // Shouldn't have to loop for a valid R1 response.
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Shouldn't have had to loop for bad CRC.
     LONGS_EQUAL(0, m_sd.maximumCRCRetryCount());
     // Maximum elapsed time for ACMD41 to leave idle state should be short.
-    LONGS_EQUAL(1, m_sd.maximumACMD41LoopTime());
+    LONGS_EQUAL(0, m_sd.maximumACMD41LoopTime());
     // Maximum elapsed time for receiveDataBlock() should init to 0.
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Maximum read retry count should init to 0.
@@ -213,6 +219,9 @@ TEST(DiskInit, DiskInit_SuccessfulSDSCv1)
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // Verify no longer in NOINIT state.
     LONGS_EQUAL(0, m_sd.disk_status());
     // Verify that card was detected as low capacity where block addresses need to be converted to 512 bytes per
@@ -220,14 +229,14 @@ TEST(DiskInit, DiskInit_SuccessfulSDSCv1)
     LONGS_EQUAL(9, m_sd.blockToAddressShift());
     // No non-zero value returned in first select() SPI exchange should be recorded.
     LONGS_EQUAL(0, m_sd.selectFirstExchangeRequiredCount());
-    // Should only loop once watiing for card to not be busy during select().
-    LONGS_EQUAL(1, m_sd.maximumWaitWhileBusyTime());
+    // Should only loop once waiting for card to not be busy during select().
+    LONGS_EQUAL(0, m_sd.maximumWaitWhileBusyTime());
     // Shouldn't have to loop for a valid R1 response.
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Shouldn't have had to loop for bad CRC.
     LONGS_EQUAL(0, m_sd.maximumCRCRetryCount());
     // Maximum elapsed time for ACMD41 to leave idle state should be short.
-    LONGS_EQUAL(1, m_sd.maximumACMD41LoopTime());
+    LONGS_EQUAL(0, m_sd.maximumACMD41LoopTime());
     // Maximum elapsed time for receiveDataBlock() should init to 0.
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Maximum read retry count should init to 0.
@@ -302,6 +311,9 @@ TEST(DiskInit, DiskInit_ReturnFFandNotFFForFirstExchanges_ShouldBeCounted)
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // The 0xFF and !0xFF in first select() SPI exchange should be recorded.
     LONGS_EQUAL(1, m_sd.selectFirstExchangeRequiredCount());
 }
@@ -314,7 +326,7 @@ TEST(DiskInit, DiskInit_RecordMaximumWaitWhileBusyLoopCountDuringSelect_ShouldLo
     setupDataForCmd();
 
     // CMD59 input data.
-    // Force waitWhileBusy() to loop twice for 0xFF.
+    // Force waitWhileBusy() to loop twice times for 0xFF.
     m_sd.spi().setInboundFromString("0000FF");
     // Return indicated R1 response.
     m_sd.spi().setInboundFromString("01");
@@ -331,6 +343,9 @@ TEST(DiskInit, DiskInit_RecordMaximumWaitWhileBusyLoopCountDuringSelect_ShouldLo
     // Return with high capacity (CCS) bit set to indicate SDHC/SDXC disk.
     setupDataForCmd();
     m_sd.spi().setInboundFromString("40000000");
+
+    // Use 10 SPI byte exchanges as 1 second.
+    m_sd.setSpiBytesPerSecond(10);
 
         LONGS_EQUAL(0, m_sd.disk_initialize());
 
@@ -375,8 +390,8 @@ TEST(DiskInit, DiskInit_RecordMaximumWaitWhileBusyLoopCountDuringSelect_ShouldLo
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
-    // Should loop twice waiting for card to not be busy during select().
-    LONGS_EQUAL(2, m_sd.maximumWaitWhileBusyTime());
+    // Should loop two times waiting for card to not be busy during select().
+    LONGS_EQUAL(2 * 1000 / 10, m_sd.maximumWaitWhileBusyTime());
 }
 
 TEST(DiskInit, DiskInit_TimeOutTheWaitWhileBusyLoopDuringSelect_ShouldFailAndLogFailure)
@@ -389,8 +404,8 @@ TEST(DiskInit, DiskInit_TimeOutTheWaitWhileBusyLoopDuringSelect_ShouldFailAndLog
    // Force waitWhileBusy() to loop twice, waiting for 0xFF.
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
         // The disk_initialize call should fail since the CMD0 failed.
         LONGS_EQUAL(STA_NOINIT, m_sd.disk_initialize());
@@ -418,7 +433,7 @@ TEST(DiskInit, DiskInit_TimeOutTheWaitWhileBusyLoopDuringSelect_ShouldFailAndLog
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
-    STRCMP_EQUAL("waitWhileBusy(500) - Time out. Response=0x00\n"
+    STRCMP_EQUAL("waitWhileBusy(2) - Time out. Response=0x00\n"
                  "select() - 500 msec time out\n"
                  "cmd(CMD0,0,0) - Select timed out\n"
                  "disk_initialize() - CMD0 returned 0xFF. Is card inserted?\n",
@@ -488,6 +503,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForR1Response_Shoul
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // Make sure that that the fact we looped once with invalid response was recorded.
     LONGS_EQUAL(1, m_sd.maximumWaitForR1ResponseLoopCount());
 }
@@ -509,6 +527,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopTooManyTimeForR1Respons
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
 
     // Should send CMD0 to reset card into idle state.
     validateSelect();
@@ -583,6 +604,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailure_Sh
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
     // Didn't send invalid R1 response.
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Check CRC count.
@@ -606,6 +630,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_S
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
 
     // Should send CMD0 to reset card into idle state.
     validateSelect();
@@ -642,6 +669,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseRetrieveErrorResponse_Shoul
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
 
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
+
     // Didn't send invalid R1 response.
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Check CRC count.
@@ -676,6 +706,9 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseRetrieveErrorResponseForCmd
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
 
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
@@ -729,8 +762,8 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseFailSelectAfterCMD55_Should
    // Force waitWhileBusy() to loop twice, waiting for 0xFF.
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
         LONGS_EQUAL(STA_NOINIT, m_sd.disk_initialize());
 
@@ -774,7 +807,7 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseFailSelectAfterCMD55_Should
     LONGS_EQUAL(0, m_sd.maximumCRCRetryCount());
 
     m_sd.dumpErrorLog(stderr);
-    STRCMP_EQUAL("waitWhileBusy(500) - Time out. Response=0x00\n"
+    STRCMP_EQUAL("waitWhileBusy(2) - Time out. Response=0x00\n"
                  "select() - 500 msec time out\n"
                  "sendCommandAndGetResponse(ACMD41,40000000,0) - CMD55 prefix select timed out\n"
                  "disk_initialize() - ACMD41 returned 0xFF\n",
@@ -802,6 +835,8 @@ TEST(DiskInit, DiskInit_FailCMD0ByNotReturningIdleResponse_ShouldFail_GetLogged)
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
 
@@ -830,6 +865,8 @@ TEST(DiskInit, DiskInit_FailCMD59ByNotReturningIdleResponse_ShouldFail_GetLogged
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -858,6 +895,8 @@ TEST(DiskInit, DiskInit_FailCMD8ByReturningDifferentVoltageMask_ShouldFail_GetLo
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -889,6 +928,8 @@ TEST(DiskInit, DiskInit_FailCMD8ByReturningDifferentCheckValue_ShouldFail_GetLog
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -924,6 +965,8 @@ TEST(DiskInit, DiskInit_FailCMD8ByReturningErrorOtherThanIllegalCommand_ShouldFa
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -965,6 +1008,8 @@ TEST(DiskInit, DiskInit_FailCMD58ByNotReturningIdleResponse_ShouldFail_GetLogged
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -1002,6 +1047,8 @@ TEST(DiskInit, DiskInit_FailCMD58ByNotReturningSupportVoltageRange_ShouldFail_Ge
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -1043,6 +1090,9 @@ TEST(DiskInit, DiskInit_MakeACMD41LoopTwiceBeforeLeavingIdleState_ShouldSucceed)
     setupDataForCmd();
     m_sd.spi().setInboundFromString("40000000");
 
+    // Use 50 SPI byte exchanges as 1 second.
+    m_sd.setSpiBytesPerSecond(50);
+
         LONGS_EQUAL(0, m_sd.disk_initialize());
 
     // Verify 400kHz clock rate for SPI.
@@ -1074,8 +1124,9 @@ TEST(DiskInit, DiskInit_MakeACMD41LoopTwiceBeforeLeavingIdleState_ShouldSucceed)
     LONGS_EQUAL(SPIDma::Frequency, settings.type);
     LONGS_EQUAL(25000000, settings.frequency);
 
-    // Make sure that it has recorded the time for two iterations.
-    LONGS_EQUAL(2, m_sd.maximumACMD41LoopTime());
+    // Make sure that it has recorded the very short time for two iterations.
+    // Should have looped twice. Takes 20 SPI byte transfers per ACMD41 command sent.
+    LONGS_EQUAL(2 * 20 * 1000 / 50, m_sd.maximumACMD41LoopTime());
 
     // Verify no longer in NOINIT state.
     LONGS_EQUAL(0, m_sd.disk_status());
@@ -1104,8 +1155,9 @@ TEST(DiskInit, DiskInit_MakeACMD41TimeOut_ShouldFail_GetLogged)
     // Still idle.
     setupDataForACmd("01");
 
-    // Set timer to elapse 500 msec / call so that second iteration of ACMD41 should timeout.
-    m_sd.timerOuter().setElapsedTimePerCall(500);
+    // Set SPI exchanges so that ACMD41 will timeout on second iteration.
+    // It takes 20 SPI bytes transfers per ACMD41 sent.
+    m_sd.setSpiBytesPerSecond(2 * 20);
 
         LONGS_EQUAL(STA_NOINIT, m_sd.disk_initialize());
 
@@ -1163,6 +1215,8 @@ TEST(DiskInit, DiskInit_FailLastCMD58WithError_ShouldFail_GetLogged)
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
 
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);
@@ -1211,6 +1265,8 @@ TEST(DiskInit, DiskInit_FailCMD16WithError_ShouldFail_GetLogged)
     // Verify 400kHz clock rate for SPI.
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
+    // Verify that SPI exchanges per second is correct for 400kHz since never completed init process.
+    LONGS_EQUAL(400000 / 8, m_sd.spiBytesPerSecond());
 
     // Should send CMD0 to reset card into idle state.
     validateCmd(0);

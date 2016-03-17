@@ -32,6 +32,7 @@ public:
     TestSDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs, const char* name)
         : SDFileSystem(mosi, miso, sclk, cs, name)
     {
+        m_keepSpiExchangePerSecond = false;
     }
 
     SPIDma& spi()
@@ -39,20 +40,36 @@ public:
         return m_spi;
     }
 
-    Timer& timer()
-    {
-        return m_timer;
-    }
-
-    Timer& timerOuter()
-    {
-        return m_timerOuter;
-    }
-
     uint32_t blockToAddressShift()
     {
         return m_blockToAddressShift;
     }
+
+    uint32_t spiBytesPerSecond()
+    {
+        return m_spiBytesPerSecond;
+    }
+
+    void setSpiBytesPerSecond(uint32_t spiExchanges)
+    {
+        m_spiBytesPerSecond = spiExchanges;
+        m_keepSpiExchangePerSecond = true;
+    }
+
+    virtual void setCurrentFrequency(uint32_t spiFrequency)
+    {
+        uint32_t old = m_spiBytesPerSecond;
+        SDFileSystem::setCurrentFrequency(spiFrequency);
+        if (m_keepSpiExchangePerSecond)
+        {
+            m_spiBytesPerSecond = old;
+        }
+    }
+
+
+
+protected:
+    bool m_keepSpiExchangePerSecond;
 };
 
 #define HIGH 1
@@ -106,6 +123,9 @@ protected:
 
         // Verify that card blockToAddress conversion is intialized to 0.
         LONGS_EQUAL(0, m_sd.blockToAddressShift());
+
+        // SPI exchanges per second should be initialized to 0.
+        LONGS_EQUAL(0, m_sd.spiBytesPerSecond());
     }
 
     size_t settingsRemaining()

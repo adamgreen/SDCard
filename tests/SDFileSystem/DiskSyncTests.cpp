@@ -44,8 +44,8 @@ TEST(DiskSync, DiskSync_SelectTimeout_ShouldFail_GetLogged)
     // Return busy on two loops through waitForNotBusy().
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
         LONGS_EQUAL(RES_ERROR, m_sd.disk_sync());
 
@@ -68,7 +68,7 @@ TEST(DiskSync, DiskSync_SelectTimeout_ShouldFail_GetLogged)
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
-    STRCMP_EQUAL("waitWhileBusy(500) - Time out. Response=0x00\n"
+    STRCMP_EQUAL("waitWhileBusy(2) - Time out. Response=0x00\n"
                  "select() - 500 msec time out\n"
                  "disk_sync() - Failed waiting for not busy\n",
                  printfSpy_GetLastOutput());

@@ -87,7 +87,7 @@ TEST(DiskRead, DiskRead_SingleBlockFromSDHC_ShouldSucceed)
     validateBuffer(buffer, sizeof(buffer), 0xAD);
 
     // receiveDataBlock() should only loop through once.
-    LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Should have had to make no read retries.
     LONGS_EQUAL(0, m_sd.maximumReadRetryCount());
 }
@@ -124,7 +124,7 @@ TEST(DiskRead, DiskRead_SingleBlockFromSDSC_ShouldConvertToByteAddress_ShouldSuc
     validateBuffer(buffer, sizeof(buffer), 0xDA);
 
     // receiveDataBlock() should only loop through once.
-    LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Should have had to make no read retries.
     LONGS_EQUAL(0, m_sd.maximumReadRetryCount());
 }
@@ -140,8 +140,8 @@ TEST(DiskRead, DiskRead_SingleBlock_SelectTimeout_ShouldFail_GetLogged)
     // Return busy on two loops through waitForNotBusy().
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Clear buffer to 0x00 before reading into it.
     memset(buffer, 0, sizeof(buffer));
@@ -172,7 +172,7 @@ TEST(DiskRead, DiskRead_SingleBlock_SelectTimeout_ShouldFail_GetLogged)
     m_sd.dumpErrorLog(stderr);
     char expectedOutput[256];
     snprintf(expectedOutput, sizeof(expectedOutput),
-             "waitWhileBusy(500) - Time out. Response=0x00\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
              "select() - 500 msec time out\n"
              "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - Select timed out\n"
              "disk_read(%X,42,1) - Read failed\n",
@@ -226,6 +226,9 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockLoopTwice_ShouldSucceed
     // Data block will contain 512 bytes of 0xAD + valid CRC.
     setupDataBlock(0xAD, 512);
 
+    // Use 10 SPI byte exchanges as 1 second.
+    m_sd.setSpiBytesPerSecond(10);
+
     // Clear buffer to 0x00 before reading into it.
     memset(buffer, 0, sizeof(buffer));
 
@@ -242,8 +245,8 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockLoopTwice_ShouldSucceed
     validateFFBytes(2+512+2);
     validateDeselect();
 
-    // Check maximum wait time.
-    LONGS_EQUAL(2, m_sd.maximumReceiveDataBlockWaitTime());
+    // Check maximum wait time for 2 iterations.
+    LONGS_EQUAL(2 * 1000 / 10, m_sd.maximumReceiveDataBlockWaitTime());
 
     // Should have read 0xAD fill into supplied read buffer.
     validateBuffer(buffer, sizeof(buffer), 0xAD);
@@ -269,8 +272,8 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeout_ShouldRetry_L
     // Data block will contain 512 bytes of 0xAD + valid CRC.
     setupDataBlock(0xAD, 512);
 
-    // Bump elapsed time so that two loops should lead to timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that 2 loops will lead to timeout.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Clear buffer to 0x00 before reading into it.
     memset(buffer, 0, sizeof(buffer));
@@ -338,8 +341,8 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeout3Times_ShouldF
     // Return 0xFF twice to make receiveDataBlock() loop and timeout.
     m_sd.spi().setInboundFromString("FFFF");
 
-    // Bump elapsed time so that two loops should lead to timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that 2 loops will lead to timeout.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Clear buffer to 0x00 before reading into it.
     memset(buffer, 0, sizeof(buffer));
@@ -445,7 +448,7 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidStartToken_Sh
     validateDeselect();
 
     // Check for maximum wait time.
-    LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
     // Read buffer should contain new data.
@@ -512,7 +515,7 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidCRC_ShouldRet
     validateDeselect();
 
     // Check for maximum wait time.
-    LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
     // Read buffer should contain new data.
@@ -568,8 +571,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FromSDHC_ShouldSucceed)
     validateBuffer(buffer, 512, 0xAD);
     validateBuffer(buffer + 512, 512, 0xDA);
 
-    // receiveDataBlock() should only loop through once.
-    LONGS_EQUAL(1, m_sd.maximumReceiveDataBlockWaitTime());
+    // receiveDataBlock() should loop a short time.
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Should have had to make no read retries.
     LONGS_EQUAL(0, m_sd.maximumReadRetryCount());
     // Should have seen no CMD12 padding bytes that actually needed to be discarded.
@@ -587,8 +590,8 @@ TEST(DiskRead, DiskRead_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
     // Return busy on two loops through waitForNotBusy().
     m_sd.spi().setInboundFromString("0000");
 
-    // Set timer to elapse 250 msec / call so that second iteration of waitWhileBusy() should timeout.
-    m_sd.timer().setElapsedTimePerCall(250);
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
 
     // Clear buffer to 0x00 before reading into it.
     memset(buffer, 0, sizeof(buffer));
@@ -619,7 +622,7 @@ TEST(DiskRead, DiskRead_MultiBlock_SelectTimeout_ShouldFail_GetLogged)
     m_sd.dumpErrorLog(stderr);
     char expectedOutput[256];
     snprintf(expectedOutput, sizeof(expectedOutput),
-             "waitWhileBusy(500) - Time out. Response=0x00\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
              "select() - 500 msec time out\n"
              "disk_read(%X,42,2) - Select timed out\n",
              (uint32_t)(size_t)buffer);

@@ -122,22 +122,22 @@ public:
     }
 
 protected:
-    uint8_t     cmd(uint8_t cmd, uint32_t argument = 0, uint32_t* pResponse = NULL);
-    bool        select();
-    void        deselect();
-    bool        waitWhileBusy(uint32_t msecTimeout);
-    uint8_t     sendCommandAndGetResponse(uint8_t cmd, uint32_t argument = 0, uint32_t* pResponse = NULL);
-    int         sendCommandAndReceiveDataBlock(uint8_t cmd, uint32_t cmdArgument, uint8_t* pBuffer, size_t bufferSize);
-    bool        receiveDataBlock(uint8_t* pBuffer, size_t bufferSize);
-    uint8_t     transmitDataBlock(uint8_t blockToken, const uint8_t* pBuffer, size_t bufferSize);
+    virtual void setCurrentFrequency(uint32_t spiFrequency);
+    uint8_t      cmd(uint8_t cmd, uint32_t argument = 0, uint32_t* pResponse = NULL);
+    bool         select();
+    void         deselect();
+    bool         waitWhileBusy(uint32_t maxSpiExchanges);
+    uint8_t      sendCommandAndGetResponse(uint8_t cmd, uint32_t argument = 0, uint32_t* pResponse = NULL);
+    int          sendCommandAndReceiveDataBlock(uint8_t cmd, uint32_t cmdArgument, uint8_t* pBuffer, size_t bufferSize);
+    bool         receiveDataBlock(uint8_t* pBuffer, size_t bufferSize);
+    uint8_t      transmitDataBlock(uint8_t blockToken, const uint8_t* pBuffer, size_t bufferSize);
 
     static const char* cmdToString(uint8_t cmd);
 
     SPIDma                 m_spi;
-    Timer                  m_timer;
-    Timer                  m_timerOuter;
     int                    m_status;
     uint32_t               m_blockToAddressShift;
+    uint32_t               m_spiBytesPerSecond;
 
     CircularLog<1024, 256> m_log;                                   // Diagnostic
     uint32_t               m_selectFirstExchangeRequiredCount;      // Diagnostic
