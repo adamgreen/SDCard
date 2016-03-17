@@ -17,7 +17,14 @@
 #include <mbed.h>
 #include <SDFileSystem.h>
 
-static SDFileSystem g_sd(p5, p6, p7, p8, "sd");
+// Set to 1 to test on CoCoCartridge which uses different pins for SPI.
+#define COCO_CARTRIDGE 0
+
+#if COCO_CARTRIDGE
+    static SDFileSystem g_sd(P1_24, P1_23, P1_20, P1_21, "sd");
+#else
+    static SDFileSystem g_sd(p5, p6, p7, p8, "sd");
+#endif // COCO_CARTRIDGE
 
 static void checkSdLog();
 static void dumpOCR();
