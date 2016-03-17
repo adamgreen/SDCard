@@ -78,11 +78,18 @@ int main(void)
             testResult = false;
         }
     }
+    // Verify that the 256 bytes were counted.
+    if (spi.getByteCount() != 256)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
+        testResult = false;
+    }
     printTestResult(testResult);
 
     // send() tests.
     printf("Verify m_spi.send()...");
     testResult = true;
+    spi.resetByteCount();
     for (int i = 0 ; i < 256 ; i++)
     {
         spi.send(i);
@@ -98,6 +105,12 @@ int main(void)
     if (byteReceived != 0x80)
     {
         printf("\nexchange()-> actual: %d expected: %d   ", byteReceived, 0x80);
+        testResult = false;
+    }
+    // Verify that the 256+1 bytes were counted.
+    if (spi.getByteCount() != 256 + 1)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 257   ", spi.getByteCount());
         testResult = false;
     }
     // Verify that the expected read values were discarded.
@@ -125,6 +138,7 @@ int main(void)
     // transfer() tests.
     printf("Verify m_spi.transfer() with valid read & write buffers...");
     testResult = true;
+    spi.resetByteCount();
     uint8_t writeBuffer[256];
     uint8_t readBuffer[256];
     memset(readBuffer, 0xAD, sizeof(readBuffer));
@@ -133,6 +147,11 @@ int main(void)
         writeBuffer[i] = 255 - i;
     }
     spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    if (spi.getByteCount() != 256)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         int expectedByte = 255 - i;
@@ -146,10 +165,16 @@ int main(void)
 
     printf("Verify m_spi.transfer() with valid read buffer & single byte write buffer...");
     testResult = true;
+    spi.resetByteCount();
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     memset(writeBuffer, 0x5A, sizeof(writeBuffer));
     writeBuffer[0] = 0xDA;
     spi.transfer(writeBuffer, 1, readBuffer, sizeof(readBuffer));
+    if (spi.getByteCount() != 256)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         if (readBuffer[i] != 0xDA)
@@ -162,12 +187,18 @@ int main(void)
 
     printf("Verify m_spi.transfer() with valid write buffer & single byte read buffer...");
     testResult = true;
+    spi.resetByteCount();
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     for (int i = 0 ; i < 256 ; i++)
     {
         writeBuffer[i] = 255 - i;
     }
     spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (spi.getByteCount() != 256)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         int expectedByte = (i == 0) ? 0 : 0xAD;
@@ -181,15 +212,22 @@ int main(void)
 
     printf("Verify m_spi.transfer() with valid write buffer & NULL read buffer...");
     testResult = true;
+    spi.resetByteCount();
     for (int i = 0 ; i < 256 ; i++)
     {
         writeBuffer[i] = 255 - i;
     }
     spi.transfer(writeBuffer, sizeof(writeBuffer), NULL, 0);
+    if (spi.getByteCount() != 256)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
+        testResult = false;
+    }
     printTestResult(testResult);
 
     printf("Verify m_spi.transfer() with full-sized read buffer right after send()...");
     testResult = true;
+    spi.resetByteCount();
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     for (int i = 0 ; i < 256 ; i++)
     {
@@ -198,6 +236,11 @@ int main(void)
     spi.send(0x5A);
     spi.send(0xA5);
     spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    if (spi.getByteCount() != 256 + 2)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         int expectedByte = 255 - i;
@@ -211,6 +254,7 @@ int main(void)
 
     printf("Verify m_spi.transfer() with single byte read buffer after send()...");
     testResult = true;
+    spi.resetByteCount();
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     for (int i = 0 ; i < 256 ; i++)
     {
@@ -219,6 +263,11 @@ int main(void)
     spi.send(0x5A);
     spi.send(0xA5);
     spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (spi.getByteCount() != 256 + 2)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         int expectedByte = (i == 0) ? 0 : 0xAD;
@@ -232,6 +281,7 @@ int main(void)
 
     printf("Verify m_spi.transfer() with single byte read buffer after send() followed by exchange()...");
     testResult = true;
+    spi.resetByteCount();
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     for (int i = 0 ; i < 256 ; i++)
     {
@@ -240,6 +290,11 @@ int main(void)
     spi.send(0x5A);
     spi.send(0xA5);
     spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (spi.getByteCount() != 256 + 2)
+    {
+        printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());
+        testResult = false;
+    }
     for (int i = 0 ; i < 256 ; i++)
     {
         int expectedByte = (i == 0) ? 0 : 0xAD;

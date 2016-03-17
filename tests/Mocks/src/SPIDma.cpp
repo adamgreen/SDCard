@@ -40,6 +40,7 @@ SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = 0 */,
     m_stringAlloc = 0;
     m_settingsAlloc = 0;
     memset(&m_settings, 0, sizeof(m_settings));
+    m_byteCount = 0;
     if (ssel > 0)
     {
         setChipSelect(sselInitVal);
@@ -127,6 +128,7 @@ void SPIDma::send(int data)
     }
 
     *m_pOutCurr++ = data;
+    m_byteCount++;
 }
 
 int  SPIDma::exchange(int data)
@@ -161,6 +163,16 @@ void SPIDma::transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_
         }
         pWrite += writeIncrement;
     }
+}
+
+uint32_t SPIDma::getByteCount()
+{
+    return m_byteCount;
+}
+
+void SPIDma::resetByteCount()
+{
+    m_byteCount = 0;
 }
 
 const char* SPIDma::getOutboundAsString(int start /* = 0 */, int count /* = -1 */)

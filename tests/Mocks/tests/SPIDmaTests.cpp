@@ -379,3 +379,73 @@ TEST(SPIDma, IsInboundBufferEmpty)
         spi.exchange(0xFF);
     CHECK_TRUE(spi.isInboundBufferEmpty());
 }
+
+TEST(SPIDma, GetByteCount_VerifyZeroAtInit)
+{
+    SPIDma spi(1, 2, 3);
+
+    LONGS_EQUAL(0, spi.getByteCount());
+}
+
+TEST(SPIDma, GetByteCount_VerifyIncrementedAfterExchanges)
+{
+    SPIDma spi(1, 2, 3);
+
+    spi.setInboundFromString("1234");
+
+    LONGS_EQUAL(0, spi.getByteCount());
+
+    LONGS_EQUAL(0x12, spi.exchange(0x9A));
+    LONGS_EQUAL(1, spi.getByteCount());
+
+    LONGS_EQUAL(0x34, spi.exchange(0xBC));
+    LONGS_EQUAL(2, spi.getByteCount());
+
+    STRCMP_EQUAL("9ABC", spi.getOutboundAsString());
+}
+
+TEST(SPIDma, GetByteCount_VerifyIncrementedAfterSends)
+{
+    SPIDma spi(1, 2, 3);
+
+    spi.setInboundFromString("1234");
+
+    LONGS_EQUAL(0, spi.getByteCount());
+
+    spi.send(0x9A);
+    LONGS_EQUAL(1, spi.getByteCount());
+
+    spi.send(0xBC);
+    LONGS_EQUAL(2, spi.getByteCount());
+
+    STRCMP_EQUAL("9ABC", spi.getOutboundAsString());
+}
+
+TEST(SPIDma, GetByteCount_VerifyIncrementedAfterTransfers)
+{
+    SPIDma spi(1, 2, 3);
+    uint8_t writeBuffer = 0x12;
+    uint8_t readBuffer[2] = { 0xFF, 0xFF };
+
+    spi.setInboundFromString("5678");
+    LONGS_EQUAL(0, spi.getByteCount());
+        spi.transfer(&writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    LONGS_EQUAL(2, spi.getByteCount());
+}
+
+TEST(SPIDma, GetByteCount_VerifyResetBackToZero)
+{
+    SPIDma spi(1, 2, 3);
+
+    spi.setInboundFromString("1234");
+
+    LONGS_EQUAL(0, spi.getByteCount());
+
+    LONGS_EQUAL(0x12, spi.exchange(0x9A));
+    LONGS_EQUAL(0x34, spi.exchange(0xBC));
+    LONGS_EQUAL(2, spi.getByteCount());
+    STRCMP_EQUAL("9ABC", spi.getOutboundAsString());
+
+    spi.resetByteCount();
+    LONGS_EQUAL(0, spi.getByteCount());
+}

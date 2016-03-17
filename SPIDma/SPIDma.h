@@ -50,6 +50,10 @@ public:
     void send(int data);
     // Waits for all data in the transmit FIFO to be completely sent before returning.
     void waitForCompletion();
+    // Number of bytes that have been transferred.
+    uint32_t getByteCount();
+    // Reset byte count returned by getByteCount().
+    void     resetByteCount();
 
 #if SPIDMA_LOOP_BACK_TEST
 public:
@@ -106,6 +110,7 @@ protected:
     uint32_t                m_channelTx;
     uint32_t                m_sspRx;
     uint32_t                m_sspTx;
+    uint32_t                m_byteCount;
 };
 
 #endif /* SPI_DMA_H_ */

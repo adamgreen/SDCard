@@ -29,6 +29,7 @@ SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = NC */
     : SPI(mosi, miso, sclk, NC), m_cs(ssel, sselInitVal)
 {
     m_readsToDiscard = 0;
+    m_byteCount = 0;
 
     // Setup GPDMA module.
     enableGpdmaPower();
@@ -91,6 +92,7 @@ void SPIDma::send(int data)
         readDiscardedBlocking();
     }
     m_readsToDiscard++;
+    m_byteCount++;
     sspWrite(data);
 }
 
@@ -150,6 +152,7 @@ int SPIDma::isWriteable()
 int  SPIDma::exchange(int data)
 {
     completeDiscardedReads();
+    m_byteCount++;
     sspWrite(data);
     return sspRead();
 }
@@ -182,6 +185,7 @@ void SPIDma::transfer(const void* pvWrite, size_t writeCount, void* pvRead, size
         actualReadCount += m_readsToDiscard;
         m_readsToDiscard = 0;
     }
+    m_byteCount += transferCount;
 
     // Must specify a buffer containing what should be written to SPI.
     // If writeCount is 1 then the single element will be repeatedly sent for each element read.
@@ -249,4 +253,14 @@ void SPIDma::waitForCompletion()
 bool SPIDma::isBusy()
 {
     return _spi.spi->SR & (1 << 4);
+}
+
+uint32_t SPIDma::getByteCount()
+{
+    return m_byteCount;
+}
+
+void SPIDma::resetByteCount()
+{
+    m_byteCount = 0;
 }

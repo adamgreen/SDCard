@@ -36,6 +36,9 @@ public:
     int  exchange(int data);
     void transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize);
 
+    uint32_t getByteCount();
+    void     resetByteCount();
+
 
     // Routines & structures just used for unit testing.
     enum SettingType
@@ -76,6 +79,7 @@ protected:
     size_t    m_stringAlloc;
     size_t    m_settingsAlloc;
     Settings  m_settings;
+    uint32_t  m_byteCount;
 };
 
 #endif /* SPI_DMA_H_ */
