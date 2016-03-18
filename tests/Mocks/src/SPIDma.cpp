@@ -41,6 +41,10 @@ SPIDma::SPIDma(PinName mosi, PinName miso, PinName sclk, PinName ssel /* = 0 */,
     m_settingsAlloc = 0;
     memset(&m_settings, 0, sizeof(m_settings));
     m_byteCount = 0;
+    m_transferCall = 0;
+    m_transferFailStart = 0;
+    m_transferFailStop = 0;
+
     if (ssel > 0)
     {
         setChipSelect(sselInitVal);
@@ -142,13 +146,19 @@ int  SPIDma::exchange(int data)
     return ret;
 }
 
-void SPIDma::transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize)
+bool SPIDma::transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize)
 {
     const uint8_t* pWrite = (const uint8_t*)pvWrite;
     uint8_t*       pRead = (uint8_t*)pvRead;
     size_t         transferSize = (writeSize > readSize) ? writeSize : readSize;
     int            readIncrement = (readSize > 1) ? 1 : 0;
     int            writeIncrement = (writeSize > 1) ? 1 : 0;
+
+    m_transferCall++;
+    if (m_transferFailStart && m_transferCall >= m_transferFailStart && m_transferCall <= m_transferFailStop)
+    {
+        return false;
+    }
 
     while (transferSize--)
     {
@@ -163,6 +173,8 @@ void SPIDma::transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_
         }
         pWrite += writeIncrement;
     }
+
+    return true;
 }
 
 uint32_t SPIDma::getByteCount()
@@ -274,4 +286,11 @@ SPIDma::Settings SPIDma::getSetting(size_t index)
 {
     assert ( (int)index < m_pSettingsCurr - m_pSettings );
     return m_pSettings[index];
+}
+
+void SPIDma::failTransferCall(uint32_t callToFail, uint32_t failRepeatCount /* = 1 */)
+{
+    m_transferCall = 0;
+    m_transferFailStart = callToFail;
+    m_transferFailStop = callToFail + failRepeatCount - 1;
 }

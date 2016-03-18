@@ -1027,7 +1027,12 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
 
     // Read block bytes into provided buffer.
     uint32_t byteToWrite = 0xFF;
-    m_spi.transfer(&byteToWrite, 1, pBuffer, bufferSize);
+    bool transferResult = m_spi.transfer(&byteToWrite, 1, pBuffer, bufferSize);
+    if (!transferResult)
+    {
+        m_log.log("receiveDataBlock(%X,%d) - SPI transfer failed\n", pBuffer, bufferSize);
+        return false;
+    }
 
     // Read and check 16-bit CRC
     uint16_t crcExpected = m_spi.exchange(0xFF) << 8;
@@ -1065,7 +1070,12 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     }
 
     // Write block bytes from provided buffer.
-    m_spi.transfer(pBuffer, bufferSize, NULL, 0);
+    bool transferResult = m_spi.transfer(pBuffer, bufferSize, NULL, 0);
+    if (!transferResult)
+    {
+        m_log.log("transmitDataBlock(%X,%X,%d) - SPI transfer failed\n", blockToken, pBuffer, bufferSize);
+        return false;
+    }
 
     // Send 16-bit CRC.
     uint16_t crc = SDCRC::crc16(pBuffer, bufferSize);

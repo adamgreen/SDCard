@@ -121,7 +121,7 @@ TEST(SPIDma, TransferOneByte_VerifyWriteAndRead)
     uint8_t readBuffer[1] = { 0xFF };
 
     spi.setInboundFromString("BC");
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    CHECK_TRUE(spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer)));
     LONGS_EQUAL(0xBC, readBuffer[0]);
     STRCMP_EQUAL("34", spi.getOutboundAsString());
 }
@@ -133,7 +133,7 @@ TEST(SPIDma, TransferTwoBytes_VerifyWritesAndReads)
     uint8_t readBuffer[2] = { 0xFF, 0xFF };
 
     spi.setInboundFromString("DEF0");
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    CHECK_TRUE(spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer)));
     LONGS_EQUAL(0xDE, readBuffer[0]);
     LONGS_EQUAL(0xF0, readBuffer[1]);
     STRCMP_EQUAL("5678", spi.getOutboundAsString());
@@ -144,7 +144,7 @@ TEST(SPIDma, TransferWithMultiByteWriteButNoRead_ShouldStillWriteSuccessfully)
     SPIDma spi(1, 2, 3);
     uint8_t writeBuffer[2] = { 0x9A, 0xBC };
 
-    spi.transfer(writeBuffer, sizeof(writeBuffer), NULL, 0);
+    CHECK_TRUE(spi.transfer(writeBuffer, sizeof(writeBuffer), NULL, 0));
     STRCMP_EQUAL("9ABC", spi.getOutboundAsString());
 }
 
@@ -155,7 +155,7 @@ TEST(SPIDma, TransferWithMultiByteWriteButOneByteReadBuffer_ShouldJustReturnLast
     uint8_t readBuffer[1] = { 0xFF };
 
     spi.setInboundFromString("1234");
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    CHECK_TRUE(spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer)));
     LONGS_EQUAL(0x34, readBuffer[0]);
     STRCMP_EQUAL("DEF0", spi.getOutboundAsString());
 }
@@ -167,10 +167,44 @@ TEST(SPIDma, TransferWithMultiByteReadButOneByteWriteBuffer_ShouldSendSameBytTwi
     uint8_t readBuffer[2] = { 0xFF, 0xFF };
 
     spi.setInboundFromString("5678");
-    spi.transfer(&writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    CHECK_TRUE(spi.transfer(&writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer)));
     LONGS_EQUAL(0x56, readBuffer[0]);
     LONGS_EQUAL(0x78, readBuffer[1]);
     STRCMP_EQUAL("1212", spi.getOutboundAsString());
+}
+
+TEST(SPIDma, CallTransferFourTimes_FailSecondAndThirdCall_FirstAndLastShouldSucceed)
+{
+    SPIDma spi(1, 2, 3);
+    uint8_t writeByte;
+    uint8_t readByte = 0xFF;
+
+    spi.setInboundFromString("11223344");
+    spi.failTransferCall(2, 2);
+
+    // 1st call should succeed.
+    writeByte = 0x12;
+        CHECK_TRUE(spi.transfer(&writeByte, sizeof(writeByte), &readByte, sizeof(readByte)));
+    LONGS_EQUAL(0x11, readByte);
+    STRCMP_EQUAL("12", spi.getOutboundAsString());
+
+    // 2nd call should fail.
+    writeByte = 0x34;
+        CHECK_FALSE(spi.transfer(&writeByte, sizeof(writeByte), &readByte, sizeof(readByte)));
+    LONGS_EQUAL(0x11, readByte);
+    STRCMP_EQUAL("12", spi.getOutboundAsString());
+
+    // 3rd call should fail.
+    writeByte = 0x56;
+        CHECK_FALSE(spi.transfer(&writeByte, sizeof(writeByte), &readByte, sizeof(readByte)));
+    LONGS_EQUAL(0x11, readByte);
+    STRCMP_EQUAL("12", spi.getOutboundAsString());
+
+    // 4th call should succeed.
+    writeByte = 0x78;
+        CHECK_TRUE(spi.transfer(&writeByte, sizeof(writeByte), &readByte, sizeof(readByte)));
+    LONGS_EQUAL(0x22, readByte);
+    STRCMP_EQUAL("1278", spi.getOutboundAsString());
 }
 
 TEST(SPIDma, SetSpecificFrequency_VerifyThatItIsRecorded)
@@ -429,7 +463,7 @@ TEST(SPIDma, GetByteCount_VerifyIncrementedAfterTransfers)
 
     spi.setInboundFromString("5678");
     LONGS_EQUAL(0, spi.getByteCount());
-        spi.transfer(&writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+        CHECK_TRUE(spi.transfer(&writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer)));
     LONGS_EQUAL(2, spi.getByteCount());
 }
 

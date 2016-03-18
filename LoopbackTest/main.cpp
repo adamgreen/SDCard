@@ -15,6 +15,9 @@
 /* Loopback tests for the SPIDma class. */
 #include <SPIDma.h>
 
+#if (!SPIDMA_LOOP_BACK_TEST)
+    #error "Must set SPIDMA_LOOP_BACK_TEST to 1 in SPIDma.h"
+#endif
 
 // States for chip select pin.
 #define HIGH 1
@@ -146,7 +149,12 @@ int main(void)
     {
         writeBuffer[i] = 255 - i;
     }
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    bool transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256)
     {
         printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
@@ -169,7 +177,12 @@ int main(void)
     memset(readBuffer, 0xAD, sizeof(readBuffer));
     memset(writeBuffer, 0x5A, sizeof(writeBuffer));
     writeBuffer[0] = 0xDA;
-    spi.transfer(writeBuffer, 1, readBuffer, sizeof(readBuffer));
+    transferResult = spi.transfer(writeBuffer, 1, readBuffer, sizeof(readBuffer));
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256)
     {
         printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
@@ -193,7 +206,12 @@ int main(void)
     {
         writeBuffer[i] = 255 - i;
     }
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256)
     {
         printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
@@ -217,7 +235,12 @@ int main(void)
     {
         writeBuffer[i] = 255 - i;
     }
-    spi.transfer(writeBuffer, sizeof(writeBuffer), NULL, 0);
+    transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), NULL, 0);
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256)
     {
         printf("\ngetByteCount() returned: %lu expected: 256   ", spi.getByteCount());
@@ -235,7 +258,12 @@ int main(void)
     }
     spi.send(0x5A);
     spi.send(0xA5);
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, sizeof(readBuffer));
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256 + 2)
     {
         printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());
@@ -262,7 +290,12 @@ int main(void)
     }
     spi.send(0x5A);
     spi.send(0xA5);
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256 + 2)
     {
         printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());
@@ -289,7 +322,12 @@ int main(void)
     }
     spi.send(0x5A);
     spi.send(0xA5);
-    spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    transferResult = spi.transfer(writeBuffer, sizeof(writeBuffer), readBuffer, 1);
+    if (!transferResult)
+    {
+        printf("\nDidn't expect transfer to fail.   ");
+        testResult = false;
+    }
     if (spi.getByteCount() != 256 + 2)
     {
         printf("\ngetByteCount() returned: %lu expected: 258   ", spi.getByteCount());

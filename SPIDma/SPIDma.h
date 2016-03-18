@@ -43,9 +43,10 @@ public:
     //  Perform a blocking write to the MOSI and read from MISO. Doesn't take advantage of FIFO.
     int  exchange(int data);
     //  Perform a multi-byte read/write using DMA. It is blocking but higher priority interrupts have less impact on
-    //  throughput since it takes advantage of DMA and the CPU is just waiting for that to complete.
+    //  throughput since it takes advantage of DMA and the CPU is just waiting for that to complete. Can return false
+    //  if the receive FIFO overflows.
     //  NOTE: Only supports 8-bit element transfers currently.
-    void transfer(const void* pvWrite, size_t writeCount, void* pvRead, size_t readCount);
+    bool transfer(const void* pvWrite, size_t writeCount, void* pvRead, size_t readCount);
     //  This is a non-blocking write. The corresponding MOSI data is ignored.
     void send(int data);
     // Waits for all data in the transmit FIFO to be completely sent before returning.

@@ -34,7 +34,7 @@ public:
 
     void send(int data);
     int  exchange(int data);
-    void transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize);
+    bool transfer(const void* pvWrite, size_t writeSize, void* pvRead, size_t readSize);
 
     uint32_t getByteCount();
     void     resetByteCount();
@@ -62,6 +62,7 @@ public:
     bool        isInboundBufferEmpty();
     size_t      getSettingsCount();
     Settings    getSetting(size_t index);
+    void        failTransferCall(uint32_t callToFail, uint32_t failRepeatCount = 1);
 
 protected:
     static uint32_t hexToNibble(char digit);
@@ -80,6 +81,9 @@ protected:
     size_t    m_settingsAlloc;
     Settings  m_settings;
     uint32_t  m_byteCount;
+    uint32_t  m_transferCall;
+    uint32_t  m_transferFailStart;
+    uint32_t  m_transferFailStop;
 };
 
 #endif /* SPI_DMA_H_ */

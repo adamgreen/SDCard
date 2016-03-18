@@ -165,13 +165,14 @@ void SPIDma::completeDiscardedReads()
     }
 }
 
-void SPIDma::transfer(const void* pvWrite, size_t writeCount, void* pvRead, size_t readCount)
+bool SPIDma::transfer(const void* pvWrite, size_t writeCount, void* pvRead, size_t readCount)
 {
-    size_t   transferCount = (writeCount > readCount) ? writeCount : readCount;
-    size_t   actualReadCount = transferCount;
-    int      readIncrement = (readCount > 1 && pvRead) ? 1 : 0;
-    int      writeIncrement = (writeCount > 1) ? 1 : 0;
-    uint32_t dummyRead = 0;
+    size_t                transferCount = (writeCount > readCount) ? writeCount : readCount;
+    size_t                actualReadCount = transferCount;
+    int                   readIncrement = (readCount > 1 && pvRead) ? 1 : 0;
+    int                   writeIncrement = (writeCount > 1) ? 1 : 0;
+    uint32_t              dummyRead = 0;
+    bool                  retVal = true;
 
     // If complete read buffer then we should first pre-fetch any discarded reads so that they don't end up in pvRead.
     if (readCount == transferCount)
@@ -192,6 +193,9 @@ void SPIDma::transfer(const void* pvWrite, size_t writeCount, void* pvRead, size
     assert ( pvWrite && writeCount > 0 );
     // If pvRead is NULL then we will use dummyRead for discarded reads.  The readCount has to be <= 1 though.
     assert ( pvRead || readCount <= 1 );
+
+    // Make sure that the Rx FIFO hasn't already overflown.
+    assert ( (_spi.spi->RIS & (1 << 0)) == 0 );
 
     // Clear error and terminal complete interrupts for both channels.
     uint32_t channelsMask = (1 << m_channelRx) | (1 << m_channelTx);
@@ -233,13 +237,46 @@ void SPIDma::transfer(const void* pvWrite, size_t writeCount, void* pvRead, size
     // Turn on DMA requests in SSP.
     _spi.spi->DMACR = 0x3;
 
-    // Wait for DMA operations to complete.
-    while ((LPC_GPDMA->DMACIntStat & channelsMask) != channelsMask)
+    // Wait for the DMA transmit to complete.
+    while ((LPC_GPDMA->DMACIntStat & (1 << m_channelTx)) == 0)
     {
+    }
+
+    // Wait for the DMA receive to complete. End early if Rx FIFO overflowed.
+    uint32_t iteration = 0;
+    while ((LPC_GPDMA->DMACIntStat & (1 << m_channelRx)) == 0)
+    {
+        // Check for Rx FIFO overflow every so often. Don't do it all the time since reading SPI peripheral registers
+        // too often will slow down the DMA operations on the same peripheral.
+        if ((++iteration & (16 - 1)) == 0 && _spi.spi->RIS & (1 << 0))
+        {
+            // Turn off DMA requests in SSP.
+            _spi.spi->DMACR = 0x0;
+
+            // Halt the Rx DMA channel.
+            m_pChannelRx->DMACCConfig = DMACCxCONFIG_HALT;
+            while (m_pChannelRx->DMACCConfig & DMACCxCONFIG_ACTIVE)
+            {
+            }
+
+            // Flush any remaining Rx FIFO data.
+            waitForCompletion();
+            while (isReadable())
+            {
+                sspRead();
+            }
+
+            // Clear the Rx overflow error.
+            _spi.spi->ICR = 1 << 0;
+            retVal = false;
+            break;
+        }
     }
 
     // Turn off DMA requests in SSP.
     _spi.spi->DMACR = 0x0;
+
+    return retVal;
 }
 
 void SPIDma::waitForCompletion()
