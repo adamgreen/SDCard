@@ -30,6 +30,15 @@
 #include "SDCRC.h"
 
 
+// The circular error log can be disabled via SDFILESYSTEM_ENABLE_ERROR_LOG
+#if SDFILESYSTEM_ENABLE_ERROR_LOG
+    #define LOG_ERROR(...) m_log.log(__VA_ARGS__)
+#else
+    #define LOG_ERROR(...)
+#endif
+
+
+
 // Possible states for SD Chip Select signal.
 #define HIGH 1
 #define LOW  0
@@ -168,7 +177,7 @@ int SDFileSystem::disk_initialize()
     uint8_t r1Response = cmd(CMD0);
     if (r1Response != R1_IDLE)
     {
-        m_log.log("disk_initialize() - CMD0 returned 0x%02X. Is card inserted?\n", r1Response);
+        LOG_ERROR("disk_initialize() - CMD0 returned 0x%02X. Is card inserted?\n", r1Response);
         return m_status;
     }
 
@@ -176,7 +185,7 @@ int SDFileSystem::disk_initialize()
     r1Response = cmd(CMD59, CMD59_CRC_OPTION_BIT);
     if (r1Response != R1_IDLE)
     {
-        m_log.log("disk_initialize() - CMD59 returned 0x%02X\n", r1Response);
+        LOG_ERROR("disk_initialize() - CMD59 returned 0x%02X\n", r1Response);
         return m_status;
     }
 
@@ -195,7 +204,7 @@ int SDFileSystem::disk_initialize()
         if ((r7Response & R7_VHS_CHECK_MASK) != (CMD8_VHS_2_7__3_6V | CMD8_CHECK_PATTERN))
         {
             // SDv2 card doesn't support the indicated voltage range so error out.
-            m_log.log("disk_initialize() - CMD8 returned 0x%08X (expected 0x%08X)\n",
+            LOG_ERROR("disk_initialize() - CMD8 returned 0x%08X (expected 0x%08X)\n",
                       r7Response, CMD8_VHS_2_7__3_6V | CMD8_CHECK_PATTERN);
             return m_status;
         }
@@ -207,7 +216,7 @@ int SDFileSystem::disk_initialize()
     }
     else
     {
-        m_log.log("disk_initialize() - CMD8 returned 0x%02X\n", r1Response);
+        LOG_ERROR("disk_initialize() - CMD8 returned 0x%02X\n", r1Response);
         return m_status;
     }
 
@@ -216,13 +225,13 @@ int SDFileSystem::disk_initialize()
     r1Response = cmd(CMD58, 0, &ocr);
     if (r1Response != R1_IDLE)
     {
-        m_log.log("disk_initialize() - CMD58 returned 0x%02X during voltage check\n", r1Response);
+        LOG_ERROR("disk_initialize() - CMD58 returned 0x%02X during voltage check\n", r1Response);
         return m_status;
     }
     // Make sure that the card supports 3.3V.
     if (0 == (ocr & OCR_3_2__3_3V))
     {
-        m_log.log("disk_initialize() - CMD58 3.3V not supported. OCR=0x%08X\n", ocr);
+        LOG_ERROR("disk_initialize() - CMD58 3.3V not supported. OCR=0x%08X\n", ocr);
         return m_status;
     }
 
@@ -246,12 +255,12 @@ int SDFileSystem::disk_initialize()
     // Check for errors.
     if (r1Response == R1_IDLE)
     {
-        m_log.log("disk_initialize() - ACMD41 timed out attempting to leave idle state\n");
+        LOG_ERROR("disk_initialize() - ACMD41 timed out attempting to leave idle state\n");
         return m_status;
     }
     else if (r1Response & R1_ERRORS_MASK)
     {
-        m_log.log("disk_initialize() - ACMD41 returned 0x%02X\n", r1Response);
+        LOG_ERROR("disk_initialize() - ACMD41 returned 0x%02X\n", r1Response);
         return m_status;
     }
 
@@ -264,7 +273,7 @@ int SDFileSystem::disk_initialize()
         r1Response = cmd(CMD58, 0, &ocr);
         if (r1Response & R1_ERRORS_MASK)
         {
-            m_log.log("disk_initialize() - CMD58 returned 0x%02X during capacity check\n", r1Response);
+            LOG_ERROR("disk_initialize() - CMD58 returned 0x%02X during capacity check\n", r1Response);
             return m_status;
         }
 
@@ -292,7 +301,7 @@ int SDFileSystem::disk_initialize()
         r1Response = cmd(CMD16, 512);
         if (r1Response & R1_ERRORS_MASK)
         {
-            m_log.log("disk_initialize() - CMD16 returned 0x%02X\n", r1Response);
+            LOG_ERROR("disk_initialize() - CMD16 returned 0x%02X\n", r1Response);
             return m_status;
         }
     }
@@ -318,14 +327,19 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
     uint32_t origBlockNumber = blockNumber;
     uint32_t origCount = count;
 
+    // These variables will throw unused warning when logging is disabled.
+    (void)pOrigBuffer;
+    (void)origBlockNumber;
+    (void)origCount;
+
     if (m_status & STA_NOINIT)
     {
-        m_log.log("disk_read(%X,%d,%d) - Attempt to read uninitialized drive\n", pOrigBuffer, origBlockNumber, origCount);
+        LOG_ERROR("disk_read(%X,%d,%d) - Attempt to read uninitialized drive\n", pOrigBuffer, origBlockNumber, origCount);
         return RES_NOTRDY;
     }
     if (!count)
     {
-        m_log.log("disk_read(%X,%d,%d) - Attempt to read 0 blocks\n", pOrigBuffer, origBlockNumber, origCount);
+        LOG_ERROR("disk_read(%X,%d,%d) - Attempt to read 0 blocks\n", pOrigBuffer, origBlockNumber, origCount);
         return RES_PARERR;
     }
 
@@ -340,7 +354,7 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
         int response = sendCommandAndReceiveDataBlock(CMD17, blockAddress, pBuffer, 512);
         if (response != RES_OK)
         {
-            m_log.log("disk_read(%X,%d,%d) - Read failed\n", pOrigBuffer, origBlockNumber, origCount);
+            LOG_ERROR("disk_read(%X,%d,%d) - Read failed\n", pOrigBuffer, origBlockNumber, origCount);
         }
         return response;
     }
@@ -354,7 +368,7 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
         if (!select())
         {
             // Log error error and return immediately.  No need to deselect() again when select() failed.
-            m_log.log("disk_read(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
+            LOG_ERROR("disk_read(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
             return RES_ERROR;
         }
 
@@ -362,7 +376,7 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
         uint8_t r1Response = sendCommandAndGetResponse(CMD18, blockAddress);
         if (r1Response != 0)
         {
-            m_log.log("disk_read(%X,%d,%d) - CMD18 returned 0x%02X\n",
+            LOG_ERROR("disk_read(%X,%d,%d) - CMD18 returned 0x%02X\n",
                       pOrigBuffer, origBlockNumber, origCount, r1Response);
             deselect();
             return RES_ERROR;
@@ -372,7 +386,7 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
         {
             if (!receiveDataBlock(pBuffer, 512))
             {
-                m_log.log("disk_read(%X,%d,%d) - receiveDataBlock failed. block=%d\n",
+                LOG_ERROR("disk_read(%X,%d,%d) - receiveDataBlock failed. block=%d\n",
                           pOrigBuffer, origBlockNumber, origCount, blockNumber);
                 // Record maximum number of read retries.
                 if (retry > m_maximumReadRetryCount)
@@ -397,7 +411,7 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
         deselect();
         if (r1Response != 0)
         {
-            m_log.log("disk_read(%X,%d,%d) - CMD12 returned 0x%02X\n",
+            LOG_ERROR("disk_read(%X,%d,%d) - CMD12 returned 0x%02X\n",
                       pOrigBuffer, origBlockNumber, origCount, r1Response);
             return RES_ERROR;
         }
@@ -420,14 +434,18 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
     uint32_t origBlockNumber = blockNumber;
     const uint8_t* pOrigBuffer = pBuffer;
 
+    // These variables will throw unused warning when logging is disabled.
+    (void)origBlockNumber;
+    (void)pOrigBuffer;
+
     if (m_status & STA_NOINIT)
     {
-        m_log.log("disk_write(%X,%d,%d) - Attempt to write uninitialized drive\n", pOrigBuffer, origBlockNumber, origCount);
+        LOG_ERROR("disk_write(%X,%d,%d) - Attempt to write uninitialized drive\n", pOrigBuffer, origBlockNumber, origCount);
         return RES_NOTRDY;
     }
     if (!count)
     {
-        m_log.log("disk_write(%X,%d,%d) - Attempt to write 0 blocks\n", pOrigBuffer, origBlockNumber, origCount);
+        LOG_ERROR("disk_write(%X,%d,%d) - Attempt to write 0 blocks\n", pOrigBuffer, origBlockNumber, origCount);
         return RES_PARERR;
     }
 
@@ -442,7 +460,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
         {
             if (!select())
             {
-                m_log.log("disk_write(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
+                LOG_ERROR("disk_write(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
                 return RES_ERROR;
             }
 
@@ -450,7 +468,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
             uint8_t r1Response = sendCommandAndGetResponse(CMD24, blockAddress);
             if (r1Response != 0)
             {
-                m_log.log("disk_write(%X,%d,%d) - CMD24 returned 0x%02X\n", pOrigBuffer, origBlockNumber, origCount, r1Response);
+                LOG_ERROR("disk_write(%X,%d,%d) - CMD24 returned 0x%02X\n", pOrigBuffer, origBlockNumber, origCount, r1Response);
                 deselect();
                 return RES_ERROR;
             }
@@ -458,7 +476,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
             uint8_t dataResponse = transmitDataBlock(BLOCK_START, pBuffer, 512);
             if (dataResponse != DATA_RESPONSE_DATA_ACCEPTED)
             {
-                m_log.log("disk_write(%X,%d,%d) - transmitDataBlock failed\n", pOrigBuffer, origBlockNumber, origCount);
+                LOG_ERROR("disk_write(%X,%d,%d) - transmitDataBlock failed\n", pOrigBuffer, origBlockNumber, origCount);
                 // Record if this was the maximum number of write attempts we have made for a single block.
                 if (retry > m_maximumWriteRetryCount)
                 {
@@ -477,7 +495,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
 
             if (!select())
             {
-                m_log.log("disk_write(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
+                LOG_ERROR("disk_write(%X,%d,%d) - Select timed out\n", pOrigBuffer, origBlockNumber, origCount);
                 return RES_ERROR;
             }
 
@@ -485,7 +503,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
             r1Response = sendCommandAndGetResponse(CMD25, blockAddress);
             if (r1Response != 0)
             {
-                m_log.log("disk_write(%X,%d,%d) - CMD25 returned 0x%02X\n", pOrigBuffer, origBlockNumber, origCount, r1Response);
+                LOG_ERROR("disk_write(%X,%d,%d) - CMD25 returned 0x%02X\n", pOrigBuffer, origBlockNumber, origCount, r1Response);
                 deselect();
                 return RES_ERROR;
             }
@@ -499,7 +517,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
                 uint8_t dataResponse = transmitDataBlock(MULTIPLE_BLOCK_START, pBuffer, 512);
                 if (dataResponse != DATA_RESPONSE_DATA_ACCEPTED)
                 {
-                    m_log.log("disk_write(%X,%d,%d) - transmitDataBlock failed. block=%d\n",
+                    LOG_ERROR("disk_write(%X,%d,%d) - transmitDataBlock failed. block=%d\n",
                                pOrigBuffer, origBlockNumber, origCount, blockNumber);
 
                     // Record if this was the maximum number of write attempts we have made for a single block.
@@ -522,7 +540,7 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
                         int result = sendCommandAndReceiveDataBlock(ACMD22, 0, data, sizeof(data));
                         if (result != RES_OK)
                         {
-                            m_log.log("disk_write(%X,%d,%d) - Failed to retrieve written block count.\n",
+                            LOG_ERROR("disk_write(%X,%d,%d) - Failed to retrieve written block count.\n",
                                        pOrigBuffer, origBlockNumber, origCount);
                             return result;
                         }
@@ -577,13 +595,13 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
         r1Response = cmd(CMD13, 0, &cardStatus);
         if (r1Response != 0)
         {
-            m_log.log("disk_write(%X,%d,%d) - CMD13 failed. r1Response=0x%02X\n",
+            LOG_ERROR("disk_write(%X,%d,%d) - CMD13 failed. r1Response=0x%02X\n",
                       pOrigBuffer, origBlockNumber, origCount, r1Response);
             return RES_ERROR;
         }
         if (cardStatus != 0)
         {
-            m_log.log("disk_write(%X,%d,%d) - CMD13 failed. Status=0x%02X\n",
+            LOG_ERROR("disk_write(%X,%d,%d) - CMD13 failed. Status=0x%02X\n",
                       pOrigBuffer, origBlockNumber, origCount, cardStatus);
             return RES_ERROR;
         }
@@ -601,7 +619,7 @@ int SDFileSystem::disk_sync()
     // returning or timing out.
     if (!select())
     {
-        m_log.log("disk_sync() - Failed waiting for not busy\n");
+        LOG_ERROR("disk_sync() - Failed waiting for not busy\n");
         return RES_ERROR;
     }
     deselect();
@@ -612,7 +630,7 @@ uint32_t SDFileSystem::disk_sectors()
 {
     if (m_status & STA_NOINIT)
     {
-        m_log.log("disk_sectors() - Attempt to query uninitialized drive\n");
+        LOG_ERROR("disk_sectors() - Attempt to query uninitialized drive\n");
         return 0;
     }
 
@@ -621,7 +639,7 @@ uint32_t SDFileSystem::disk_sectors()
     int response = getCSD(csd, sizeof(csd));
     if (response != RES_OK)
     {
-        m_log.log("disk_sectors() - Failed to read CSD\n");
+        LOG_ERROR("disk_sectors() - Failed to read CSD\n");
         return 0;
     }
 
@@ -652,7 +670,7 @@ int SDFileSystem::getCID(uint8_t* pCID, size_t cidSize)
     int response = sendCommandAndReceiveDataBlock(CMD10, 0, pCID, 16);
     if (response != RES_OK)
     {
-        m_log.log("getCID(%X,%d) - Register read failed\n", pCID, cidSize);
+        LOG_ERROR("getCID(%X,%d) - Register read failed\n", pCID, cidSize);
     }
     return response;
 }
@@ -666,7 +684,7 @@ int SDFileSystem::getCSD(uint8_t* pCSD, size_t csdSize)
     int response = sendCommandAndReceiveDataBlock(CMD9, 0, pCSD, 16);
     if (response != RES_OK)
     {
-        m_log.log("getCSD(%X,%d) - Register read failed\n", pCSD, csdSize);
+        LOG_ERROR("getCSD(%X,%d) - Register read failed\n", pCSD, csdSize);
     }
     return response;
 }
@@ -676,7 +694,7 @@ int SDFileSystem::getOCR(uint32_t* pOCR)
     uint8_t r1Response = cmd(CMD58, 0, pOCR);
     if (r1Response & R1_ERRORS_MASK)
     {
-        m_log.log("getOCR(%X) - Register read failed. Response=0x%02X\n", pOCR, r1Response);
+        LOG_ERROR("getOCR(%X) - Register read failed. Response=0x%02X\n", pOCR, r1Response);
         return RES_ERROR;
     }
     return RES_OK;
@@ -732,7 +750,7 @@ uint8_t SDFileSystem::cmd(uint8_t cmd, uint32_t argument /* = 0 */, uint32_t* pR
     // 7.2 SPI Bus Protocol - Need to assert chip select low before writing the command out over SPI.
     if (!select())
     {
-        m_log.log("cmd(%s,%X,%X) - Select timed out\n", cmdToString(cmd), argument, pResponse);
+        LOG_ERROR("cmd(%s,%X,%X) - Select timed out\n", cmdToString(cmd), argument, pResponse);
         return 0xFF;
     }
 
@@ -780,7 +798,7 @@ bool SDFileSystem::select()
     if (!waitWhileBusy(m_spiBytesPerSecond / 2))
     {
         // Card never left busy state after 500 msecs.
-        m_log.log("select() - 500 msec time out\n");
+        LOG_ERROR("select() - 500 msec time out\n");
         deselect();
         return false;
     }
@@ -810,7 +828,7 @@ bool SDFileSystem::waitWhileBusy(uint32_t maxSpiExchanges)
     // Response won't be 0xFF if we timed out.
     if (response != 0xFF)
     {
-        m_log.log("waitWhileBusy(%u) - Time out. Response=0x%02X\n", maxSpiExchanges, response);
+        LOG_ERROR("waitWhileBusy(%u) - Time out. Response=0x%02X\n", maxSpiExchanges, response);
         return false;
     }
 
@@ -832,6 +850,9 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
     uint8_t  origCmd = cmd;
     uint32_t retry;
 
+    // This variable will throw unused warning when logging is disabled.
+    (void)origCmd;
+
     // Handle relooping on CRC error.
     for (retry = 1 ; retry <= 4 ; retry++)
     {
@@ -841,7 +862,7 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
             r1Response = sendCommandAndGetResponse(CMD55);
             if (r1Response & R1_ERRORS_MASK)
             {
-                m_log.log("sendCommandAndGetResponse(%s,%X,%X) - CMD55 prefix returned 0x%02X\n",
+                LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - CMD55 prefix returned 0x%02X\n",
                           cmdToString(origCmd), argument, pResponse, r1Response);
                 return r1Response;
             }
@@ -850,7 +871,7 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
             deselect();
             if (!select())
             {
-                m_log.log("sendCommandAndGetResponse(%s,%X,%X) - CMD55 prefix select timed out\n",
+                LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - CMD55 prefix select timed out\n",
                           cmdToString(origCmd), argument, pResponse);
                 return 0xFF;
             }
@@ -904,7 +925,7 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
         // Check for errors.
         if (r1Response & R1_START_BIT)
         {
-            m_log.log("sendCommandAndGetResponse(%s,%X,%X) - Timed out waiting for valid R1 response. r1Response=0x%02X\n",
+            LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - Timed out waiting for valid R1 response. r1Response=0x%02X\n",
                       cmdToString(origCmd), argument, pResponse, r1Response);
             return 0xFF;
         }
@@ -947,7 +968,7 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
     }
 
     // Get here if failed CRC multiple times.
-    m_log.log("sendCommandAndGetResponse(%s,%X,%X) - Failed CRC check %d times\n",
+    LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - Failed CRC check %d times\n",
               cmdToString(origCmd), argument, pResponse, retry - 1);
     return r1Response;
 }
@@ -963,7 +984,7 @@ int SDFileSystem::sendCommandAndReceiveDataBlock(uint8_t cmd, uint32_t cmdArgume
         if (!select())
         {
             // Log error error and return immediately.  No need to deselect() again when select() failed.
-            m_log.log("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - Select timed out\n",
+            LOG_ERROR("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - Select timed out\n",
                       cmdToString(cmd), cmdArgument, pBuffer, bufferSize);
             return RES_ERROR;
         }
@@ -972,13 +993,13 @@ int SDFileSystem::sendCommandAndReceiveDataBlock(uint8_t cmd, uint32_t cmdArgume
         uint8_t r1Response = sendCommandAndGetResponse(cmd, cmdArgument);
         if (r1Response != 0)
         {
-            m_log.log("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - %s returned 0x%02X\n",
+            LOG_ERROR("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - %s returned 0x%02X\n",
                        cmdToString(cmd), cmdArgument, pBuffer, bufferSize, cmdToString(cmd), r1Response);
             break;
         }
         if (!receiveDataBlock(pBuffer, bufferSize))
         {
-            m_log.log("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - receiveDataBlock failed\n",
+            LOG_ERROR("sendCommandAndReceiveDataBlock(%s,%X,%X,%d) - receiveDataBlock failed\n",
                       cmdToString(cmd), cmdArgument, pBuffer, bufferSize);
             // Record maximum number of read retries.
             if (retry > m_maximumReadRetryCount)
@@ -1022,7 +1043,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     // Check for timeout waiting for non-0xFF byte read.
     if (byte == 0xFF)
     {
-        m_log.log("receiveDataBlock(%X,%d) - Time out after 500ms\n", pBuffer, bufferSize);
+        LOG_ERROR("receiveDataBlock(%X,%d) - Time out after 500ms\n", pBuffer, bufferSize);
         m_receiveTimeoutCount++;
         return false;
     }
@@ -1031,7 +1052,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     // 0xFE is the start block for single/multiple reads.
     if (byte != BLOCK_START)
     {
-        m_log.log("receiveDataBlock(%X,%d) - Expected 0xFE start block token. Response=0x%02X\n",
+        LOG_ERROR("receiveDataBlock(%X,%d) - Expected 0xFE start block token. Response=0x%02X\n",
                   pBuffer, bufferSize, byte);
         m_receiveBadTokenCount++;
         return false;
@@ -1042,7 +1063,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     bool transferResult = m_spi.transfer(&byteToWrite, 1, pBuffer, bufferSize);
     if (!transferResult)
     {
-        m_log.log("receiveDataBlock(%X,%d) - SPI transfer failed\n", pBuffer, bufferSize);
+        LOG_ERROR("receiveDataBlock(%X,%d) - SPI transfer failed\n", pBuffer, bufferSize);
         m_receiveTransferFailCount++;
         return false;
     }
@@ -1053,7 +1074,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     uint16_t crcActual = SDCRC::crc16(pBuffer, bufferSize);
     if (crcActual != crcExpected)
     {
-        m_log.log("receiveDataBlock(%X,%d) - Invalid CRC. Expected=0x%04X Actual=0x%04X\n",
+        LOG_ERROR("receiveDataBlock(%X,%d) - Invalid CRC. Expected=0x%04X Actual=0x%04X\n",
                   pBuffer, bufferSize, crcExpected, crcActual);
         m_receiveCrcErrorCount++;
         return false;
@@ -1068,7 +1089,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     //                    the chip to no longer be busy.
     if (!waitWhileBusy(m_spiBytesPerSecond / 2))
     {
-        m_log.log("transmitDataBlock(%X,%X,%d) - Time out after 500ms\n", blockToken, pBuffer, bufferSize);
+        LOG_ERROR("transmitDataBlock(%X,%X,%d) - Time out after 500ms\n", blockToken, pBuffer, bufferSize);
         m_transmitTimeoutCount++;
         return DATA_RESPONSE_UNKNOWN_ERROR;
     }
@@ -1088,7 +1109,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     bool transferResult = m_spi.transfer(pBuffer, bufferSize, NULL, 0);
     if (!transferResult)
     {
-        m_log.log("transmitDataBlock(%X,%X,%d) - SPI transfer failed\n", blockToken, pBuffer, bufferSize);
+        LOG_ERROR("transmitDataBlock(%X,%X,%d) - SPI transfer failed\n", blockToken, pBuffer, bufferSize);
         m_transmitTransferFailCount++;
         return DATA_RESPONSE_UNKNOWN_ERROR;
     }
@@ -1103,7 +1124,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     uint8_t dataResponse = m_spi.exchange(0xFF);
     if ((dataResponse & DATA_RESPONSE_MASK) != DATA_RESPONSE_DATA_ACCEPTED)
     {
-        m_log.log("transmitDataBlock(%X,%X,%d) - Data Response=0x%02X\n", blockToken, pBuffer, bufferSize, dataResponse);
+        LOG_ERROR("transmitDataBlock(%X,%X,%d) - Data Response=0x%02X\n", blockToken, pBuffer, bufferSize, dataResponse);
         m_transmitResponseErrorCount++;
     }
     return dataResponse & DATA_RESPONSE_MASK;

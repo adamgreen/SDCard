@@ -24,6 +24,7 @@ static void dumpCSDv2(SDFileSystem* pSD, uint8_t* pCSD);
 
 void checkSdLog(SDFileSystem* pSD)
 {
+#if SDFILESYSTEM_ENABLE_ERROR_LOG
     if (pSD->isErrorLogEmpty())
     {
         return;
@@ -32,6 +33,7 @@ void checkSdLog(SDFileSystem* pSD)
     fprintf(stderr, "**SDFileSystem internal errors**\n");
     pSD->dumpErrorLog(stderr);
     pSD->clearErrorLog();
+#endif // SDFILESYSTEM_ENABLE_ERROR_LOG`
 }
 
 void dumpOCR(SDFileSystem* pSD)

@@ -32,6 +32,10 @@
 #include <CircularLog.h>
 #include <stdint.h>
 
+// The circular error log can be disabled by setting SDFILESYSTEM_ENABLE_ERROR_LOG to 0.
+#define SDFILESYSTEM_ENABLE_ERROR_LOG 1
+
+
 class SDFileSystem : public FATFileSystem
 {
 public:
@@ -54,6 +58,7 @@ public:
     static uint32_t extractBits(const uint8_t* p, size_t size, uint32_t lowBit, uint32_t highBit);
 
     // *** Accessors for diagnostic information. ***
+#if SDFILESYSTEM_ENABLE_ERROR_LOG
     // The following methods provide access to the circular log file of error text.
     void dumpErrorLog(FILE* pFile)
     {
@@ -67,6 +72,7 @@ public:
     {
         m_log.clear();
     }
+#endif // SDFILESYSTEM_ENABLE_ERROR_LOG
 
     // Count how many times the first SPI exchange in select() was actually required.
     uint32_t selectFirstExchangeRequiredCount()
@@ -179,8 +185,10 @@ protected:
     uint32_t               m_blockToAddressShift;
     uint32_t               m_spiBytesPerSecond;
 
+#if SDFILESYSTEM_ENABLE_ERROR_LOG
     // Error Log.
     CircularLog<1024, 256> m_log;
+#endif // SDFILESYSTEM_ENABLE_ERROR_LOG
 
     // Diagnostic Counters.
     uint32_t               m_selectFirstExchangeRequiredCount;
