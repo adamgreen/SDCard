@@ -269,4 +269,13 @@ void dumpSdCounters(SDFileSystem* pSD)
     DUMP_COUNTER(maximumReadRetryCount, 0);
     DUMP_COUNTER(cmd12PaddingByteRequiredCount, 0);
     DUMP_COUNTER(maximumWriteRetryCount, 0);
+    DUMP_COUNTER(cmdCrcErrorCount, 0);
+    DUMP_COUNTER(receiveTimeoutCount, 0);
+    DUMP_COUNTER(receiveBadTokenCount, 0);
+    DUMP_COUNTER(receiveTransferFailCount, 0);
+    DUMP_COUNTER(receiveCrcErrorCount, 0);
+    DUMP_COUNTER(transmitTimeoutCount, 0);
+    DUMP_COUNTER(transmitTransferFailCount, 0);
+    DUMP_COUNTER(transmitResponseErrorCount, 0);
+
 }

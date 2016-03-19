@@ -124,7 +124,7 @@ SDFileSystem::SDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs,
     m_blockToAddressShift = 0;
     m_spiBytesPerSecond = 0;
 
-    // Initialize Diagnostic Fields.
+    // Initialize Diagnostic Counters.
     m_selectFirstExchangeRequiredCount = 0;
     m_maximumWaitWhileBusyTime = 0;
     m_maximumWaitForR1ResponseLoopCount = 0;
@@ -134,6 +134,14 @@ SDFileSystem::SDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs,
     m_maximumReadRetryCount = 0;
     m_cmd12PaddingByteRequiredCount = 0;
     m_maximumWriteRetryCount = 0;
+    m_cmdCrcErrorCount = 0;
+    m_receiveTimeoutCount = 0;
+    m_receiveBadTokenCount = 0;
+    m_receiveTransferFailCount = 0;
+    m_receiveCrcErrorCount = 0;
+    m_transmitTimeoutCount = 0;
+    m_transmitTransferFailCount = 0;
+    m_transmitResponseErrorCount = 0;
 
     m_spi.format(8, polarity0phase0);
 }
@@ -907,6 +915,8 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
             {
                 m_maximumCRCRetryCount = retry;
             }
+            // Update total CRC failure counter.
+            m_cmdCrcErrorCount++;
             // Retry
             continue;
         }
@@ -1013,6 +1023,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     if (byte == 0xFF)
     {
         m_log.log("receiveDataBlock(%X,%d) - Time out after 500ms\n", pBuffer, bufferSize);
+        m_receiveTimeoutCount++;
         return false;
     }
 
@@ -1022,6 +1033,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     {
         m_log.log("receiveDataBlock(%X,%d) - Expected 0xFE start block token. Response=0x%02X\n",
                   pBuffer, bufferSize, byte);
+        m_receiveBadTokenCount++;
         return false;
     }
 
@@ -1031,6 +1043,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     if (!transferResult)
     {
         m_log.log("receiveDataBlock(%X,%d) - SPI transfer failed\n", pBuffer, bufferSize);
+        m_receiveTransferFailCount++;
         return false;
     }
 
@@ -1042,6 +1055,7 @@ bool SDFileSystem::receiveDataBlock(uint8_t* pBuffer, size_t bufferSize)
     {
         m_log.log("receiveDataBlock(%X,%d) - Invalid CRC. Expected=0x%04X Actual=0x%04X\n",
                   pBuffer, bufferSize, crcExpected, crcActual);
+        m_receiveCrcErrorCount++;
         return false;
     }
 
@@ -1055,6 +1069,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     if (!waitWhileBusy(m_spiBytesPerSecond / 2))
     {
         m_log.log("transmitDataBlock(%X,%X,%d) - Time out after 500ms\n", blockToken, pBuffer, bufferSize);
+        m_transmitTimeoutCount++;
         return DATA_RESPONSE_UNKNOWN_ERROR;
     }
 
@@ -1074,7 +1089,8 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     if (!transferResult)
     {
         m_log.log("transmitDataBlock(%X,%X,%d) - SPI transfer failed\n", blockToken, pBuffer, bufferSize);
-        return false;
+        m_transmitTransferFailCount++;
+        return DATA_RESPONSE_UNKNOWN_ERROR;
     }
 
     // Send 16-bit CRC.
@@ -1088,6 +1104,7 @@ uint8_t SDFileSystem::transmitDataBlock(uint8_t blockToken, const uint8_t* pBuff
     if ((dataResponse & DATA_RESPONSE_MASK) != DATA_RESPONSE_DATA_ACCEPTED)
     {
         m_log.log("transmitDataBlock(%X,%X,%d) - Data Response=0x%02X\n", blockToken, pBuffer, bufferSize, dataResponse);
+        m_transmitResponseErrorCount++;
     }
     return dataResponse & DATA_RESPONSE_MASK;
 }

@@ -611,6 +611,87 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailure_Sh
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Check CRC count.
     LONGS_EQUAL(1, m_sd.maximumCRCRetryCount());
+    LONGS_EQUAL(1, m_sd.cmdCrcErrorCount());
+}
+
+TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnTwoCommands_ShouldSucceed_Counted)
+{
+    validateConstructor();
+
+    // CMD0 input data - Force it to loop once for CRC error response.
+    // select() expects to receive a response which is not 0xFF for the first byte read.
+    m_sd.spi().setInboundFromString("00");
+    // Return not-busy on first loop in waitForNotBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Make sendCommandAndGetResponse() loop once for CRC failure.
+    m_sd.spi().setInboundFromString("0801");
+
+    // CMD59 input data - Force it to loop once for CRC error response as well.
+    // select() expects to receive a response which is not 0xFF for the first byte read.
+    m_sd.spi().setInboundFromString("00");
+    // Return not-busy on first loop in waitForNotBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Make sendCommandAndGetResponse() loop once for CRC failure.
+    m_sd.spi().setInboundFromString("0801");
+
+    // CMD8 input data and R7 response.
+    setupDataForCmd();
+    m_sd.spi().setInboundFromString("000001AD");
+    // CMD58 input data and R3 response (OCR) which is checked for voltage ranges.
+    setupDataForCmd();
+    m_sd.spi().setInboundFromString("00100000");
+    // ACMD41 input data. Return 0 to indicate not in idle state anymore.
+    setupDataForACmd("00");
+    // CMD58 input data and R3 response (OCR) which is checked for high capacity disk.
+    // Return with high capacity (CCS) bit set to indicate SDHC/SDXC disk.
+    setupDataForCmd();
+    m_sd.spi().setInboundFromString("40000000");
+
+        LONGS_EQUAL(0, m_sd.disk_initialize());
+
+    // Verify 400kHz clock rate for SPI.
+    // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
+    validate400kHzClockAnd80PrimingClockEdges();
+
+    // Should send CMD0 to reset card into idle state, retries for CRC failure.
+    validateSelect();
+    validateCmdPacket(0);
+    validateCmdPacket(0);
+    validateDeselect();
+    // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
+    // Retries for CRC failure.
+    validateSelect();
+    validateCmdPacket(59, 1);
+    validateCmdPacket(59, 1);
+    validateDeselect();
+    // Should send CMD8 to determine if the card is SDv2 or SDv1 card.
+    // The argument should be 0x1AD to select 2.7 - 3.6V range and us 0xAD as check pattern.
+    validateCmd(8, 0x1AD, 4);
+    // Should send CMD58 to read OCR register and determine voltage levels supported.
+    validateCmd(58, 0, 4);
+    // Should send ACMD41 (CMD55 + CMD41) to start init process and leave the idle state.
+    // The argument to have bit 30 set to indicate that this host support high capacity disks.
+    validateACmd(41, 0x40000000);
+    // Should send CMD58 again to read OCR register to determine if the card is high capacity or not.
+    validateCmd(58, 0, 4);
+
+    // Should set frequency at end of init process.
+    // Verify 25MHz clock rate for SPI.
+    CHECK_TRUE(settingsRemaining() >= 1);
+    SPIDma::Settings settings = m_sd.spi().getSetting(m_settingsIndex++);
+    LONGS_EQUAL(SPIDma::Frequency, settings.type);
+    LONGS_EQUAL(25000000, settings.frequency);
+
+    // Verify that SPI exchanges per second is correct for 25MHz.
+    LONGS_EQUAL(25000000 / 8, m_sd.spiBytesPerSecond());
+
+    // Didn't send invalid R1 response.
+    LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
+    // Check CRC count.
+    // Maximum retry for single command was 1.
+    LONGS_EQUAL(1, m_sd.maximumCRCRetryCount());
+    // Total of 2 command CRC failures though.
+    LONGS_EQUAL(2, m_sd.cmdCrcErrorCount());
 }
 
 TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_ShouldFail_GetLogged_Counted)
@@ -646,6 +727,7 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_S
     LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
     // Check CRC count.
     LONGS_EQUAL(4, m_sd.maximumCRCRetryCount());
+    LONGS_EQUAL(4, m_sd.cmdCrcErrorCount());
 
     m_sd.dumpErrorLog(stderr);
     STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - Failed CRC check 4 times\n"

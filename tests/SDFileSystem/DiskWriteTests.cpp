@@ -262,6 +262,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceWaitWhileBusyToTimeout_ShouldRetry_Lo
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
     // The 500 msec delay for two cycles should be recorded.
     LONGS_EQUAL(500, m_sd.maximumWaitWhileBusyTime());
+    // Check timeout count.
+    LONGS_EQUAL(1, m_sd.transmitTimeoutCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -270,6 +272,131 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceWaitWhileBusyToTimeout_ShouldRetry_Lo
              "waitWhileBusy(2) - Time out. Response=0x00\n"
              "transmitDataBlock(FE,%08X,512) - Time out after 500ms\n"
              "disk_write(%X,42,1) - transmitDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer);
+    STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
+
+TEST(DiskWrite, DiskWrite_SingleBlock_ForceWaitWhileBusyToTimeoutOn2Blocks_ShouldRetry_Logged_Recorded)
+{
+    uint8_t buffer[512];
+
+    initSDHC();
+
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Keep returning busy in waitWhileBusy().
+    m_sd.spi().setInboundFromString("0000");
+
+    // Retry which should be successful.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Return successful write response token.
+    m_sd.spi().setInboundFromString("05");
+    // CMD13 input data with successful R2 response.
+    setupDataForCmd("00");
+    m_sd.spi().setInboundFromString("00");
+
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
+
+    // Fill the write buffer with data to write.
+    memset(buffer, 0xAD, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_write(buffer, 42, 1));
+
+    // First failed attempt.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 42);
+    // Should have sent two 0xFF byte in waitWhileBusy().
+    validateFFBytes(2);
+    // Deselect as the write is now complete.
+    validateDeselect();
+
+    // Successful retry.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 42);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token, buffer data, and CRC.
+    validateDataBlock(0xFE, 0xAD);
+    // Deselect as the write is now complete.
+    validateDeselect();
+    // Should send CMD13 to get R2 write status.
+    validateCmd(13, 0, 1);
+
+
+    // Do it all again.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Keep returning busy in waitWhileBusy().
+    m_sd.spi().setInboundFromString("0000");
+
+    // Retry which should be successful.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Return successful write response token.
+    m_sd.spi().setInboundFromString("05");
+    // CMD13 input data with successful R2 response.
+    setupDataForCmd("00");
+    m_sd.spi().setInboundFromString("00");
+
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
+
+    // Fill the write buffer with data to write.
+    memset(buffer, 0xAC, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_write(buffer, 43, 1));
+
+    // First failed attempt.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 43);
+    // Should have sent two 0xFF byte in waitWhileBusy().
+    validateFFBytes(2);
+    // Deselect as the write is now complete.
+    validateDeselect();
+
+    // Successful retry.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 43);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token, buffer data, and CRC.
+    validateDataBlock(0xFE, 0xAC);
+    // Deselect as the write is now complete.
+    validateDeselect();
+    // Should send CMD13 to get R2 write status.
+    validateCmd(13, 0, 1);
+
+
+    // Check per block retry count.
+    LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // The 500 msec delay for two cycles should be recorded.
+    LONGS_EQUAL(500, m_sd.maximumWaitWhileBusyTime());
+    // Check total number of timeouts.
+    LONGS_EQUAL(2, m_sd.transmitTimeoutCount());
+
+    // Verify error log output.
+    m_sd.dumpErrorLog(stderr);
+    char expectedOutput[512];
+    snprintf(expectedOutput, sizeof(expectedOutput),
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
+             "transmitDataBlock(FE,%08X,512) - Time out after 500ms\n"
+             "disk_write(%X,42,1) - transmitDataBlock failed\n"
+             "waitWhileBusy(2) - Time out. Response=0x00\n"
+             "transmitDataBlock(FE,%08X,512) - Time out after 500ms\n"
+             "disk_write(%X,43,1) - transmitDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer,
              (uint32_t)(size_t)buffer,
              (uint32_t)(size_t)buffer);
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
@@ -331,6 +458,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_FailTransmitDataBlockWithInvalidCRC_Should
 
     // Should have required 1 retry.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // 1 CRC error response.
+    LONGS_EQUAL(1, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -413,6 +542,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceTransmitDataBlockToFailCRC3Times_Shou
 
     // Should have required 3 retries.
     LONGS_EQUAL(3, m_sd.maximumWriteRetryCount());
+    // 3 CRC error responses.
+    LONGS_EQUAL(3, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -487,6 +618,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_FailTransmitDataBlockWithTransferError_Sho
 
     // Should have required 1 retry.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // Transfer failed once.
+    LONGS_EQUAL(1, m_sd.transmitTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -494,6 +627,132 @@ TEST(DiskWrite, DiskWrite_SingleBlock_FailTransmitDataBlockWithTransferError_Sho
     snprintf(expectedOutput, sizeof(expectedOutput),
              "transmitDataBlock(FE,%08X,512) - SPI transfer failed\n"
              "disk_write(%X,42,1) - transmitDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer);
+    STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
+
+TEST(DiskWrite, DiskWrite_SingleBlock_FailTransmitDataBlockWithTransferErrorOnTwoBlocks_ShouldRetry_Logged_Recorded)
+{
+    uint8_t buffer[512];
+
+    initSDHC();
+
+    // Fail first attempt with transfer error.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+
+    // Successful attempt.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Return successful write response token.
+    m_sd.spi().setInboundFromString("05");
+    // CMD13 input data with successful R2 response.
+    setupDataForCmd("00");
+    m_sd.spi().setInboundFromString("00");
+
+    // Just fail the first call to transfer.
+    m_sd.spi().failTransferCall(1, 1);
+
+    // Fill the write buffer with data to write.
+    memset(buffer, 0xAD, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_write(buffer, 42, 1));
+
+    // Failed first attempt with transfer error.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 42);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token.
+    STRCMP_EQUAL("FE", m_sd.spi().getOutboundAsString(m_byteIndex++, 1));
+    // Deselect as the write is now complete.
+    validateDeselect();
+
+    // Successful on retry.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 42);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token, buffer data, and CRC.
+    validateDataBlock(0xFE, 0xAD);
+    // Deselect as the write is now complete.
+    validateDeselect();
+    // Should send CMD13 to get R2 write status.
+    validateCmd(13, 0, 1);
+
+
+    // Do it all again.
+    // Fail first attempt with transfer error.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+
+    // Successful attempt.
+    // CMD24 input data.
+    setupDataForCmd("00");
+    // Return not-busy on first loop in waitWhileBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Return successful write response token.
+    m_sd.spi().setInboundFromString("05");
+    // CMD13 input data with successful R2 response.
+    setupDataForCmd("00");
+    m_sd.spi().setInboundFromString("00");
+
+    // Just fail the first call to transfer.
+    m_sd.spi().failTransferCall(1, 1);
+
+    // Fill the write buffer with data to write.
+    memset(buffer, 0xAC, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_write(buffer, 43, 1));
+
+    // Failed first attempt with transfer error.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 43);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token.
+    STRCMP_EQUAL("FE", m_sd.spi().getOutboundAsString(m_byteIndex++, 1));
+    // Deselect as the write is now complete.
+    validateDeselect();
+
+    // Successful on retry.
+    validateSelect();
+    // Should send CMD24 to start write process.  Argument is block number.
+    validateCmdPacket(24, 43);
+    // Should have sent one 0xFF byte in waitWhileBusy().
+    validateFFBytes(1);
+    // Should send start block token, buffer data, and CRC.
+    validateDataBlock(0xFE, 0xAC);
+    // Deselect as the write is now complete.
+    validateDeselect();
+    // Should send CMD13 to get R2 write status.
+    validateCmd(13, 0, 1);
+
+    // Should have required 1 retry per block.
+    LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // Transfer failed twice.
+    LONGS_EQUAL(2, m_sd.transmitTransferFailCount());
+
+    // Verify error log output.
+    m_sd.dumpErrorLog(stderr);
+    char expectedOutput[512];
+    snprintf(expectedOutput, sizeof(expectedOutput),
+             "transmitDataBlock(FE,%08X,512) - SPI transfer failed\n"
+             "disk_write(%X,42,1) - transmitDataBlock failed\n"
+             "transmitDataBlock(FE,%08X,512) - SPI transfer failed\n"
+             "disk_write(%X,43,1) - transmitDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer,
              (uint32_t)(size_t)buffer,
              (uint32_t)(size_t)buffer);
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
@@ -566,6 +825,8 @@ TEST(DiskWrite, DiskWrite_SingleBlock_ForceTransmitDataBlockToFailTransfer3Times
 
     // Should have required 3 retries.
     LONGS_EQUAL(3, m_sd.maximumWriteRetryCount());
+    // Failed transfer 3 times.
+    LONGS_EQUAL(3, m_sd.transmitTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1146,6 +1407,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockCrcOnceOnEachBlock_ShouldRetry
 
     // Should have required a maximum of 1 retry for any single block.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // A total of 4 CRC error responses.
+    LONGS_EQUAL(4, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1258,6 +1521,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Sho
 
     // Should have required the maximum 3 retries.
     LONGS_EQUAL(3, m_sd.maximumWriteRetryCount());
+    // 3 CRC error responses.
+    LONGS_EQUAL(3, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1275,7 +1540,7 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Sho
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
 }
 
-TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockTransferOnceOnEachBlock_ShouldRetryAndSucceed_GetLogged_GetCounted)
+TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockTransferOnFirstBlock_ShouldRetryAndSucceed_GetLogged_GetCounted)
 {
     uint8_t buffer[2*512];
 
@@ -1360,6 +1625,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockTransferOnceOnEachBlock_Should
 
     // Should have required 1 retry for any single block.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // Transfer failed once.
+    LONGS_EQUAL(1, m_sd.transmitTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1460,6 +1727,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockTransferForFirstBlockThreeTime
 
     // Should have required the maximum 3 retries.
     LONGS_EQUAL(3, m_sd.maximumWriteRetryCount());
+    // Transfer should have failed 3 imes.
+    LONGS_EQUAL(3, m_sd.transmitTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1607,6 +1876,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailDataBlockWithWriteError_RewindBlockPoin
 
     // Should have required a maximum of 1 retry for any single block.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // One write error response was returned.
+    LONGS_EQUAL(1, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1636,7 +1907,7 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailACMD22DuringWriteFailureRecovery_Should
     m_sd.spi().setInboundFromString("05");
     // Return not-busy on first loop in waitWhileBusy().
     m_sd.spi().setInboundFromString("FF");
-    // Return successful write response token.
+    // Return write error response token.
     m_sd.spi().setInboundFromString("0D");
     // CMD12 input data.
     setupDataForCmd12("00");
@@ -1674,6 +1945,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_FailACMD22DuringWriteFailureRecovery_Should
 
     // Should have required a maximum of 1 retry for any single block.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // Returned one write error response.
+    LONGS_EQUAL(1, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1715,7 +1988,7 @@ TEST(DiskWrite, DiskWrite_MultiBlock_ReturnTooLargeBlockCountInACMD22Call_Should
     m_sd.spi().setInboundFromString("05");
     // Return not-busy on first loop in waitWhileBusy().
     m_sd.spi().setInboundFromString("FF");
-    // Return successful write response token.
+    // Return write error response token.
     m_sd.spi().setInboundFromString("0D");
     // CMD12 input data.
     setupDataForCmd12("00");
@@ -1805,6 +2078,8 @@ TEST(DiskWrite, DiskWrite_MultiBlock_ReturnTooLargeBlockCountInACMD22Call_Should
 
     // Should have required a maximum of 1 retry for any single block.
     LONGS_EQUAL(1, m_sd.maximumWriteRetryCount());
+    // One error response from SD card.
+    LONGS_EQUAL(1, m_sd.transmitResponseErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);

@@ -303,6 +303,8 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeout_ShouldRetry_L
     LONGS_EQUAL(500, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Check timeout counter.
+    LONGS_EQUAL(1, m_sd.receiveTimeoutCount());
     // Read buffer should contain new data.
     validateBuffer(buffer, sizeof(buffer), 0xAD);
 
@@ -314,6 +316,125 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeout_ShouldRetry_L
              "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n",
              (uint32_t)(size_t)buffer,
              42, (uint32_t)(size_t)buffer);
+    STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
+
+TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeoutOn2DifferentBlocks_ShouldRetry_Logged_Recorded)
+{
+    uint8_t buffer[512];
+
+    initSDHC();
+
+    // Time out this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // Return 0xFF twice to make receiveDataBlock() loop and timeout.
+    m_sd.spi().setInboundFromString("FFFF");
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Set SPI exchanges so that 2 loops will lead to timeout.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 42, 1));
+
+    // Failed attempt due to time out.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should send 2 FF bytes when timing out the wait for header.
+    validateFFBytes(2);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+
+    // Do it all again.
+    // Time out this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // Return 0xFF twice to make receiveDataBlock() loop and timeout.
+    m_sd.spi().setInboundFromString("FFFF");
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Set SPI exchanges so that 2 loops will lead to timeout.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 43, 1));
+
+    // Failed attempt due to time out.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should send 2 FF bytes when timing out the wait for header.
+    validateFFBytes(2);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+
+    // Check for maximum wait time.
+    LONGS_EQUAL(500, m_sd.maximumReceiveDataBlockWaitTime());
+    // Check maximum retry count per block.
+    LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Check total timeouts enountered.
+    LONGS_EQUAL(2, m_sd.receiveTimeoutCount());
+
+    // Verify error log output.
+    m_sd.dumpErrorLog(stderr);
+    char expectedOutput[512];
+    snprintf(expectedOutput, sizeof(expectedOutput),
+             "receiveDataBlock(%08X,512) - Time out after 500ms\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n"
+             "receiveDataBlock(%08X,512) - Time out after 500ms\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             42, (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer,
+             43, (uint32_t)(size_t)buffer);
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
 }
 
@@ -379,6 +500,8 @@ TEST(DiskRead, DiskRead_SingleBlock_ForceReceiveDataBlockToTimeout3Times_ShouldF
     LONGS_EQUAL(500, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(3, m_sd.maximumReadRetryCount());
+    // Check receive time out counter.
+    LONGS_EQUAL(3, m_sd.receiveTimeoutCount());
     // Read buffer should contain original data.
     validateBuffer(buffer, sizeof(buffer), 0x00);
 
@@ -451,6 +574,8 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidStartToken_Sh
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Check incorrect token counter.
+    LONGS_EQUAL(1, m_sd.receiveBadTokenCount());
     // Read buffer should contain new data.
     validateBuffer(buffer, sizeof(buffer), 0xAD);
 
@@ -462,6 +587,117 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidStartToken_Sh
              "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n",
              (uint32_t)(size_t)buffer,
              42,(uint32_t)(size_t)buffer);
+    STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
+
+TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidStartTokenOnTwoBlocks_ShouldRetry_Logged_Recorded)
+{
+    uint8_t buffer[512];
+
+    initSDHC();
+
+    // Fail this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // Return 0xFD, the incorrect start token.
+    m_sd.spi().setInboundFromString("FD");
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 42, 1));
+
+    // Failed attempt due to time out.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should send 1 FF byte when reading the invalid header.
+    validateFFBytes(1);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+
+    // Do it all again.
+    // Fail this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // Return 0xFD, the incorrect start token.
+    m_sd.spi().setInboundFromString("FD");
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 43, 1));
+
+    // Failed attempt due to time out.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should send 1 FF byte when reading the invalid header.
+    validateFFBytes(1);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+
+    // Check for maximum wait time.
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
+    // Check maximum retry count for single block is 1.
+    LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Check incorrect token counter occurred twice.
+    LONGS_EQUAL(2, m_sd.receiveBadTokenCount());
+
+    // Verify error log output.
+    m_sd.dumpErrorLog(stderr);
+    char expectedOutput[512];
+    snprintf(expectedOutput, sizeof(expectedOutput),
+             "receiveDataBlock(%08X,512) - Expected 0xFE start block token. Response=0xFD\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n"
+             "receiveDataBlock(%08X,512) - Expected 0xFE start block token. Response=0xFD\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             42,(uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer,
+             43,(uint32_t)(size_t)buffer);
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
 }
 
@@ -518,6 +754,7 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithInvalidCRC_ShouldRet
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    LONGS_EQUAL(1, m_sd.receiveCrcErrorCount());
     // Read buffer should contain new data.
     validateBuffer(buffer, sizeof(buffer), 0xAD);
 
@@ -584,6 +821,7 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithFailTransferCall_Sho
     LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
     // Check for retry count.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    LONGS_EQUAL(1, m_sd.receiveTransferFailCount());
     // Read buffer should contain new data.
     validateBuffer(buffer, sizeof(buffer), 0xAD);
 
@@ -598,6 +836,123 @@ TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockWithFailTransferCall_Sho
     STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
 }
 
+TEST(DiskRead, DiskRead_SingleBlock_FailReceiveDataBlockFailTransferFor2Blocks_ShouldRetry_Logged_Recorded)
+{
+    uint8_t buffer[512];
+
+    initSDHC();
+
+    // Fail this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Will fail transfer call right after reading that 0xFE token.
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Just fail the first call to transfer.
+    m_sd.spi().failTransferCall(1, 1);
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 42, 1));
+
+    // Failed attempt due to transfer failure.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should just send FF byte to read in header as the rest will be failed.
+    validateFFBytes(1);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 42);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+
+    // Do it all again.
+    // Fail this attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Will fail transfer call right after reading that 0xFE token.
+
+    // Successful attempt.
+    // CMD17 input data.
+    setupDataForCmd("00");
+    // 0xFE starts read data block.
+    m_sd.spi().setInboundFromString("FE");
+    // Data block will contain 512 bytes of 0xAD + valid CRC.
+    setupDataBlock(0xAD, 512);
+
+    // Just fail the first call to transfer.
+    m_sd.spi().failTransferCall(1, 1);
+
+    // Clear buffer to 0x00 before reading into it.
+    memset(buffer, 0, sizeof(buffer));
+
+        LONGS_EQUAL(RES_OK, m_sd.disk_read(buffer, 43, 1));
+
+    // Failed attempt due to transfer failure.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should just send FF byte to read in header as the rest will be failed.
+    validateFFBytes(1);
+    validateDeselect();
+
+    // Successful attempt.
+    validateSelect();
+    // Should send CMD17 to start read process.  Argument is block number.
+    validateCmdPacket(17, 43);
+    // Should send multiple FF bytes to read in data block:
+    //  1 to read in header.
+    //  512 to read data.
+    //  2 to read CRC.
+    validateFFBytes(1+512+2);
+    validateDeselect();
+    // Read buffer should contain new data.
+    validateBuffer(buffer, sizeof(buffer), 0xAD);
+
+    // Check for maximum wait time.
+    LONGS_EQUAL(0, m_sd.maximumReceiveDataBlockWaitTime());
+    // Maximum retry for a single block is 1.
+    LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Failed transfer a total of 2 times though.
+    LONGS_EQUAL(2, m_sd.receiveTransferFailCount());
+
+    // Verify error log output.
+    m_sd.dumpErrorLog(stderr);
+    char expectedOutput[512];
+    snprintf(expectedOutput, sizeof(expectedOutput),
+             "receiveDataBlock(%08X,512) - SPI transfer failed\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n"
+             "receiveDataBlock(%08X,512) - SPI transfer failed\n"
+             "sendCommandAndReceiveDataBlock(CMD17,%X,%X,512) - receiveDataBlock failed\n",
+             (uint32_t)(size_t)buffer,
+             42, (uint32_t)(size_t)buffer,
+             (uint32_t)(size_t)buffer,
+             43, (uint32_t)(size_t)buffer);
+    STRCMP_EQUAL(expectedOutput, printfSpy_GetLastOutput());
+}
 TEST(DiskRead, DiskRead_MultiBlock_FromSDHC_ShouldSucceed)
 {
     uint8_t buffer[1024];
@@ -968,6 +1323,8 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForEachBlockOnce_ShouldSuccee
 
     // Only failed CRC check once for any single block.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    // Failed on CRC check a total of 4 times.
+    LONGS_EQUAL(4, m_sd.receiveCrcErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1069,6 +1426,7 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockCrcForFirstBlockThreeTimes_Shoul
 
     // Failed CRC check 3 times on single block.
     LONGS_EQUAL(3, m_sd.maximumReadRetryCount());
+    LONGS_EQUAL(3, m_sd.receiveCrcErrorCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1151,6 +1509,7 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockTransferForFirstBlockOnce_Should
 
     // Should have counted the one transfer failure.
     LONGS_EQUAL(1, m_sd.maximumReadRetryCount());
+    LONGS_EQUAL(1, m_sd.receiveTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);
@@ -1229,6 +1588,7 @@ TEST(DiskRead, DiskRead_MultiBlock_FailDataBlockTransferForFirstBlockThreeTimes_
 
     // Failed transfer 3 times on single block.
     LONGS_EQUAL(3, m_sd.maximumReadRetryCount());
+    LONGS_EQUAL(3, m_sd.receiveTransferFailCount());
 
     // Verify error log output.
     m_sd.dumpErrorLog(stderr);

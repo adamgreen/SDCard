@@ -120,6 +120,46 @@ public:
     {
         return m_maximumWriteRetryCount;
     }
+    // The total number of times that a SD command failed due to the 7-bit CRC on the command packet itself.
+    uint32_t cmdCrcErrorCount()
+    {
+        return m_cmdCrcErrorCount;
+    }
+    // The total number of times that receiveDataBlock() times out waiting for start of block token.
+    uint32_t receiveTimeoutCount()
+    {
+        return m_receiveTimeoutCount;
+    }
+    // The total number of times that receiveDataBlock() doesn't receive the expected BLOCK_START token.
+    uint32_t receiveBadTokenCount()
+    {
+        return m_receiveBadTokenCount;
+    }
+    // The total number of times that receiveDataBlock() fails the 512-byte SPI DMA transfer.
+    uint32_t receiveTransferFailCount()
+    {
+        return m_receiveTransferFailCount;
+    }
+    // The total number of times that receiveDataBlock() fails due to the 16-bit CRC on the data block being incorrect.
+    uint32_t receiveCrcErrorCount()
+    {
+        return m_receiveCrcErrorCount;
+    }
+    // The total number of times that transmitDataBlock() times out waiting for SD card to complete previous write.
+    uint32_t transmitTimeoutCount()
+    {
+        return m_transmitTimeoutCount;
+    }
+    // The total number of times that transmitDataBlock() fails the 512-byte SPI DMA transfer.
+    uint32_t transmitTransferFailCount()
+    {
+        return m_transmitTransferFailCount;
+    }
+    // The total number of times that transmitDataBlock() receives error response back from SD card.
+    uint32_t transmitResponseErrorCount()
+    {
+        return m_transmitResponseErrorCount;
+    }
 
 protected:
     virtual void setCurrentFrequency(uint32_t spiFrequency);
@@ -139,16 +179,27 @@ protected:
     uint32_t               m_blockToAddressShift;
     uint32_t               m_spiBytesPerSecond;
 
-    CircularLog<1024, 256> m_log;                                   // Diagnostic
-    uint32_t               m_selectFirstExchangeRequiredCount;      // Diagnostic
-    uint32_t               m_maximumWaitWhileBusyTime;              // Diagnostic
-    uint32_t               m_maximumWaitForR1ResponseLoopCount;     // Diagnostic
-    uint32_t               m_maximumCRCRetryCount;                  // Diagnostic
-    uint32_t               m_maximumACMD41LoopTime;                 // Diagnostic
-    uint32_t               m_maximumReceiveDataBlockWaitTime;       // Diagnostic
-    uint32_t               m_maximumReadRetryCount;                 // Diagnostic
-    uint32_t               m_cmd12PaddingByteRequiredCount;         // Diagnostic
-    uint32_t               m_maximumWriteRetryCount;                // Diagnostic
+    // Error Log.
+    CircularLog<1024, 256> m_log;
+
+    // Diagnostic Counters.
+    uint32_t               m_selectFirstExchangeRequiredCount;
+    uint32_t               m_maximumWaitWhileBusyTime;
+    uint32_t               m_maximumWaitForR1ResponseLoopCount;
+    uint32_t               m_maximumCRCRetryCount;
+    uint32_t               m_maximumACMD41LoopTime;
+    uint32_t               m_maximumReceiveDataBlockWaitTime;
+    uint32_t               m_maximumReadRetryCount;
+    uint32_t               m_cmd12PaddingByteRequiredCount;
+    uint32_t               m_maximumWriteRetryCount;
+    uint32_t               m_cmdCrcErrorCount;
+    uint32_t               m_receiveTimeoutCount;
+    uint32_t               m_receiveBadTokenCount;
+    uint32_t               m_receiveTransferFailCount;
+    uint32_t               m_receiveCrcErrorCount;
+    uint32_t               m_transmitTimeoutCount;
+    uint32_t               m_transmitTransferFailCount;
+    uint32_t               m_transmitResponseErrorCount;
 };
 
 #endif // SD_FILE_SYSTEM_H
