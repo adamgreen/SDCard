@@ -17,7 +17,7 @@ GCC4MBED_DIR    := ../gcc4mbed
 NEWLIB_NANO     := 0
 NO_FLOAT_SCANF  := 0
 NO_FLOAT_PRINTF := 0
-USER_LIBS       := ../FATFileSystem ../SDFileSystem ../SPIDma ../CircularLog
+USER_LIBS       := ../SDTestLib ../FATFileSystem ../SDFileSystem ../SPIDma ../CircularLog
 
 # The following line can be uncommented to place the binary in a location where
 # it can be used with the DFU bootloader on the Smoothie1 board.
