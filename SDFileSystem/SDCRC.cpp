@@ -15,7 +15,13 @@
  * limitations under the License.
  */
 #include <assert.h>
+#include <stdlib.h>
 #include "SDCRC.h"
+
+// Set to non-zero to inject random CRC failures for fault testing.
+#define INJECT_CRC7_ERROR  0
+#define INJECT_CRC16_ERROR 0
+
 
 // On Thumb targets, we can take advantage of __REV16 for CRC16 code.
 #ifdef __thumb__
@@ -106,6 +112,11 @@ uint8_t crc7(const uint8_t* pData, size_t length)
         crc = g_Crc7Table[(crc << 1) ^ *pData++];
     }
 
+    if (INJECT_CRC7_ERROR > 0 && (rand() % INJECT_CRC7_ERROR) == 0)
+    {
+        crc ^= 0x5A;
+    }
+
     //Return the calculated checksum
     return crc;
 }
@@ -137,6 +148,11 @@ uint16_t crc16(const uint8_t* pData, size_t length)
         crc = (crc << 8) ^ g_Crc16Table[(crc >> 8) & 0x00FF];
 
         length -= 4;
+    }
+
+    if (INJECT_CRC16_ERROR > 0 && (rand() % INJECT_CRC16_ERROR) == 0)
+    {
+        crc ^= 0xF00D;
     }
 
     // Return the calculated checksum

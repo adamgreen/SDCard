@@ -92,8 +92,9 @@ DEPS :=
 
 # Useful macros.
 objs = $(addprefix $2/,$(addsuffix .o,$(patsubst ../%,%,$(basename $(wildcard $1/*.c $1/*.cpp $1/*.S)))))
-host_objs = $(call objs,$1,$(HOST_OBJDIR))
-gcov_host_objs = $(call objs,$1,$(GCOV_HOST_OBJDIR))
+objs_noasm = $(addprefix $2/,$(addsuffix .o,$(patsubst ../%,%,$(basename $(wildcard $1/*.c $1/*.cpp)))))
+host_objs = $(call objs_noasm,$1,$(HOST_OBJDIR))
+gcov_host_objs = $(call objs_noasm,$1,$(GCOV_HOST_OBJDIR))
 add_deps = $(patsubst %.o,%.d,$(HOST_$1_OBJ) $(GCOV_HOST_$1_OBJ))
 obj_to_gcda = $(patsubst %.o,%.gcda,$1)
 includes = $(patsubst %,-I%,$1)

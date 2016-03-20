@@ -18,7 +18,9 @@
 #include <string.h>
 #include <SDFileSystem.h>
 #include <SDCRC.h>
+#include <SingleThreadedCheck.h>
 #include <diskio.h>
+#include <mri.h>
 
 #include <printfSpy.h>
 
@@ -89,6 +91,8 @@ protected:
         m_settingsIndex = 0;
         m_byteIndex = 0;
         printfSpy_Hook(1024);
+        g_debugBreakCount = 0;
+        SingleThreadedCheck::m_threadCount = 0;
     }
 
     void teardown()
@@ -99,6 +103,7 @@ protected:
         // Make sure that all SPI test input was consumed.
         CHECK_TRUE(m_sd.spi().isInboundBufferEmpty());
         printfSpy_Unhook();
+        LONGS_EQUAL(0, g_debugBreakCount);
     }
 
     void validateConstructor()

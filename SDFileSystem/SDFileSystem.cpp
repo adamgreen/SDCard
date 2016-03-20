@@ -28,6 +28,7 @@
 #include <diskio.h>
 #include "SDFileSystem.h"
 #include "SDCRC.h"
+#include "SingleThreadedCheck.h"
 
 
 // The circular error log can be disabled via SDFILESYSTEM_ENABLE_ERROR_LOG
@@ -157,6 +158,9 @@ SDFileSystem::SDFileSystem(PinName mosi, PinName miso, PinName sclk, PinName cs,
 
 int SDFileSystem::disk_initialize()
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // Follow the flow-chart from section "7.2.1 Mode Selection and Initialization"
     // of the "SD Specifications Part 1 Physical Layer Simplified Specification Version 4.10"
     bool isSDv2 = false;
@@ -322,6 +326,9 @@ int SDFileSystem::disk_status()
 
 int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t count)
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // Save for the purpose of error logging original parameter values.
     uint8_t* pOrigBuffer = pBuffer;
     uint32_t origBlockNumber = blockNumber;
@@ -429,6 +436,9 @@ int SDFileSystem::disk_read(uint8_t* pBuffer, uint32_t blockNumber, uint32_t cou
 
 int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint32_t count)
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // Save for the purpose of error logging original parameter values.
     uint32_t origCount = count;
     uint32_t origBlockNumber = blockNumber;
@@ -615,6 +625,9 @@ int SDFileSystem::disk_write(const uint8_t* pBuffer, uint32_t blockNumber, uint3
 
 int SDFileSystem::disk_sync()
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // Calling select() will assert chip select low and wait for any outstanding writes to leave busy state before
     // returning or timing out.
     if (!select())
@@ -628,6 +641,8 @@ int SDFileSystem::disk_sync()
 
 uint32_t SDFileSystem::disk_sectors()
 {
+    // Don't need to use SingleThreadedCheck here as the call to getCSD() will perform the necessary check.
+
     if (m_status & STA_NOINIT)
     {
         LOG_ERROR("disk_sectors() - Attempt to query uninitialized drive\n");
@@ -663,6 +678,9 @@ uint32_t SDFileSystem::disk_sectors()
 
 int SDFileSystem::getCID(uint8_t* pCID, size_t cidSize)
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // CID register is 16 bytes in length.
     assert ( cidSize == 16 );
 
@@ -677,6 +695,9 @@ int SDFileSystem::getCID(uint8_t* pCID, size_t cidSize)
 
 int SDFileSystem::getCSD(uint8_t* pCSD, size_t csdSize)
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     // CSD register is 16 bytes in length.
     assert ( csdSize == 16 );
 
@@ -691,6 +712,9 @@ int SDFileSystem::getCSD(uint8_t* pCSD, size_t csdSize)
 
 int SDFileSystem::getOCR(uint32_t* pOCR)
 {
+    // Makes sure that only 1 thread is attempting to use the SDFileSystem.
+    SingleThreadedCheck check;
+
     uint8_t r1Response = cmd(CMD58, 0, pOCR);
     if (r1Response & R1_ERRORS_MASK)
     {
@@ -931,6 +955,8 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
         }
         else if (r1Response & R1_CRC_ERROR)
         {
+            LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - CRC error response\n",
+                      cmdToString(origCmd), argument, pResponse);
             // Record the maximum number of CRC iterations we have tried.
             if (retry > m_maximumCRCRetryCount)
             {
@@ -938,7 +964,15 @@ uint8_t SDFileSystem::sendCommandAndGetResponse(uint8_t cmd, uint32_t argument /
             }
             // Update total CRC failure counter.
             m_cmdCrcErrorCount++;
-            // Retry
+
+            // Retry the command again after toggling the chip select line.
+            deselect();
+            if (!select())
+            {
+                LOG_ERROR("sendCommandAndGetResponse(%s,%X,%X) - CRC retry select timed out\n",
+                          cmdToString(origCmd), argument, pResponse);
+                return 0xFF;
+            }
             continue;
         }
         else if (r1Response & R1_ERRORS_MASK)

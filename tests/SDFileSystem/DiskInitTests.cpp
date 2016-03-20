@@ -556,7 +556,7 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailure_Sh
     // Return not-busy on first loop in waitForNotBusy().
     m_sd.spi().setInboundFromString("FF");
     // Make sendCommandAndGetResponse() loop once for CRC failure.
-    m_sd.spi().setInboundFromString("0801");
+    m_sd.spi().setInboundFromString("0800FF01");
 
     // CMD59 input data.
     setupDataForCmd();
@@ -579,9 +579,11 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailure_Sh
     // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
     validate400kHzClockAnd80PrimingClockEdges();
 
-    // Should send CMD0 to reset card into idle state.
+    // Should send CMD0 to reset card into idle state.  Retries for CRC failure.
     validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(0);
     validateDeselect();
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
@@ -612,6 +614,69 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailure_Sh
     // Check CRC count.
     LONGS_EQUAL(1, m_sd.maximumCRCRetryCount());
     LONGS_EQUAL(1, m_sd.cmdCrcErrorCount());
+
+    m_sd.dumpErrorLog(stderr);
+    STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n",
+                 printfSpy_GetLastOutput());
+}
+
+TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseFailCrcAndThenTimeOutSelect_ShouldFail_Counted)
+{
+    validateConstructor();
+
+    // CMD0 input data - Force it to loop once for CRC error response.
+    // select() expects to receive a response which is not 0xFF for the first byte read.
+    m_sd.spi().setInboundFromString("00");
+    // Return not-busy on first loop in waitForNotBusy().
+    m_sd.spi().setInboundFromString("FF");
+    // Make sendCommandAndGetResponse() loop once for CRC failure.
+    m_sd.spi().setInboundFromString("08000000");
+
+    // Set SPI exchanges so that waitWhileBusy() will timeout on second iteration.
+    m_sd.setSpiBytesPerSecond(2 * (1000/500));
+
+        LONGS_EQUAL(STA_NOINIT, m_sd.disk_initialize());
+
+    // Verify 400kHz clock rate for SPI.
+    // Verify chip select is set high while 80 > 74 clocks are sent to chip during powerup.
+    validate400kHzClockAnd80PrimingClockEdges();
+
+    // Should send CMD0 to reset card into idle state.  Retries for CRC failure.
+    validateSelect();
+    validateCmdPacket(0);
+    validateDeselect();
+
+    // Verify timed out select transaction.
+    // Should have set chip select low.
+    CHECK_TRUE(settingsRemaining() >= 1);
+    SPIDma::Settings settings = m_sd.spi().getSetting(m_settingsIndex++);
+    LONGS_EQUAL(SPIDma::ChipSelect, settings.type);
+    LONGS_EQUAL(LOW, settings.chipSelect);
+    LONGS_EQUAL(m_byteIndex, settings.bytesSentBefore);
+    // Should write one 0xFF byte to card to prime it for communication.
+    STRCMP_EQUAL("FF", m_sd.spi().getOutboundAsString(m_byteIndex++, 1));
+    // Should write 0xFF until 0xFF is received to indicate that the card is no longer busy.
+    STRCMP_EQUAL("FFFF", m_sd.spi().getOutboundAsString(m_byteIndex, 2));
+    m_byteIndex += 2;
+    validateDeselect();
+    // An extra deselect occurs after catching the select() failure.  That is ok as it has no negative impact.
+    validateDeselect();
+
+    // The 500 msec delay for two cycles should be recorded.
+    LONGS_EQUAL(500, m_sd.maximumWaitWhileBusyTime());
+    // Didn't send invalid R1 response.
+    LONGS_EQUAL(0, m_sd.maximumWaitForR1ResponseLoopCount());
+    // Check CRC count.
+    LONGS_EQUAL(1, m_sd.maximumCRCRetryCount());
+    LONGS_EQUAL(1, m_sd.cmdCrcErrorCount());
+
+    m_sd.dumpErrorLog(stderr);
+    STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "waitWhileBusy(2) - Time out. Response=0x00\n"
+                 "select() - 500 msec time out\n"
+                 "sendCommandAndGetResponse(CMD0,0,0) - CRC retry select timed out\n"
+                 "disk_initialize() - CMD0 returned 0xFF. Is card inserted?\n",
+                 printfSpy_GetLastOutput());
 }
 
 TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnTwoCommands_ShouldSucceed_Counted)
@@ -624,7 +689,7 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnT
     // Return not-busy on first loop in waitForNotBusy().
     m_sd.spi().setInboundFromString("FF");
     // Make sendCommandAndGetResponse() loop once for CRC failure.
-    m_sd.spi().setInboundFromString("0801");
+    m_sd.spi().setInboundFromString("0800FF01");
 
     // CMD59 input data - Force it to loop once for CRC error response as well.
     // select() expects to receive a response which is not 0xFF for the first byte read.
@@ -632,7 +697,7 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnT
     // Return not-busy on first loop in waitForNotBusy().
     m_sd.spi().setInboundFromString("FF");
     // Make sendCommandAndGetResponse() loop once for CRC failure.
-    m_sd.spi().setInboundFromString("0801");
+    m_sd.spi().setInboundFromString("0800FF01");
 
     // CMD8 input data and R7 response.
     setupDataForCmd();
@@ -656,12 +721,16 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnT
     // Should send CMD0 to reset card into idle state, retries for CRC failure.
     validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(0);
     validateDeselect();
     // Should send CMD59 to enable CRC.  The argument should be 0x00000001 to enable it.
     // Retries for CRC failure.
     validateSelect();
     validateCmdPacket(59, 1);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(59, 1);
     validateDeselect();
     // Should send CMD8 to determine if the card is SDv2 or SDv1 card.
@@ -692,6 +761,11 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopOnceForCMDCrcFailureOnT
     LONGS_EQUAL(1, m_sd.maximumCRCRetryCount());
     // Total of 2 command CRC failures though.
     LONGS_EQUAL(2, m_sd.cmdCrcErrorCount());
+
+    m_sd.dumpErrorLog(stderr);
+    STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "sendCommandAndGetResponse(CMD59,1,0) - CRC error response\n",
+                 printfSpy_GetLastOutput());
 }
 
 TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_ShouldFail_GetLogged_Counted)
@@ -704,7 +778,12 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_S
     // Return not-busy on first loop in waitForNotBusy().
     m_sd.spi().setInboundFromString("FF");
     // Make sendCommandAndGetResponse() loop four times because of CRC failure.
-    m_sd.spi().setInboundFromString("08080808");
+    m_sd.spi().setInboundFromString("08");
+    m_sd.spi().setInboundFromString("00FF08");
+    m_sd.spi().setInboundFromString("00FF08");
+    m_sd.spi().setInboundFromString("00FF08");
+    // It will do one final deselect/select sequence before determining that it has maxed out retries.
+    m_sd.spi().setInboundFromString("00FF");
 
         LONGS_EQUAL(STA_NOINIT, m_sd.disk_initialize());
 
@@ -718,9 +797,17 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_S
     // Should send CMD0 to reset card into idle state.
     validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateCmdPacket(0);
+    validateDeselect();
+    validateSelect();
     validateDeselect();
 
     // Didn't send invalid R1 response.
@@ -730,7 +817,11 @@ TEST(DiskInit, DiskInit_MakeSendCommandAndGetResponseLoopFourTimesToCrcFailure_S
     LONGS_EQUAL(4, m_sd.cmdCrcErrorCount());
 
     m_sd.dumpErrorLog(stderr);
-    STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - Failed CRC check 4 times\n"
+    STRCMP_EQUAL("sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "sendCommandAndGetResponse(CMD0,0,0) - CRC error response\n"
+                 "sendCommandAndGetResponse(CMD0,0,0) - Failed CRC check 4 times\n"
                  "disk_initialize() - CMD0 returned 0x08. Is card inserted?\n",
                  printfSpy_GetLastOutput());
 }
