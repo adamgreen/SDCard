@@ -21,6 +21,6 @@ USER_LIBS       := ../SDTestLib ../FATFileSystem ../SDFileSystem ../SPIDma ../Ci
 
 # The following line can be uncommented to place the binary in a location where
 # it can be used with the DFU bootloader on the Smoothie1 board.
-#LPC1768_LSCRIPT := ../SDTestLib/SmoothieLPC1768.ld
+LPC1768_LSCRIPT := ../SDTestLib/SmoothieLPC1768.ld
 
 include $(GCC4MBED_DIR)/build/gcc4mbed.mk
