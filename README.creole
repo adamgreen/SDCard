@@ -24,16 +24,17 @@ This version of the SD card driver was heavily influenced by these previous vers
 
 
 
-==PerformanceTest
-The code in the [[https://github.com/adamgreen/SDCard/tree/master/PerformanceTest | PerformanceTest/ folder]] uses an
-updated SDFileSystem driver to create a 10MB file on the root of a SD card and then reads it.  It displays the measured
-data rates obtained during these read/write operations.  It also dumps some of the core properties of the SD card and a
+==SoakTest
+The code in the [[https://github.com/adamgreen/SDCard/tree/master/SoakTest | SoakTest/ folder]] uses an
+updated SDFileSystem driver to create a file on the root of a SD card and then reads from it at random locations.  It
+continues to perform these random reads, validating the read data as it progresses, until the user sends a key press
+to stop the test. It can be run for an extended period of time to verify read robustness of the card/driver. It will log
+about errors that it encounters during the read process. It also dumps some of the core properties of the SD card and a
 few internal SDFileSystem counters that help me determine how well it is working on different devices.
 
 ===Important Notes!
 * **Backup your data before running this test.** This is a beta quality driver with writes enabled so it could
   inadvertently destroy data by mistake.
-* Your card must have at least 10MB of free space on it for the test to run successfully.
 * The pre-built binary has been built to run on the Smoothie v1 hardware.
 ** It is built to be loaded into FLASH at an offset of 16K.  This makes it compatible with the boot loader typically
    used with Smoothieboards.
@@ -42,13 +43,16 @@ few internal SDFileSystem counters that help me determine how well it is working
    1x6 pin Serial header on the Smoothieboard.
 * To see the test progress and results you should connect your favorite terminal emulator to your SmoothieBoard
   at **9600-N-8-1**.
-* Once the firmware is loaded, just pressing the reset button should be enough to start the test running.
+* Once the firmware is loaded, press the reset button to start the test running. The user will then be prompted
+  for the size of the test file to use. I tend to pick a value between 1 and 100 (MB).
 
 I would really appreciate it if people could run this test on their SmoothieBoards with various uSD cards that they have
 and report back their results!  The [[https://github.com/adamgreen/SDCard/tree/master/bins | bins/ folder]] contains a
 pre-built
-[[https://github.com/adamgreen/SDCard/blob/master/bins/PerformanceTest-Smoothie1.bin?raw=true | PerformanceTest-Smoothie1.bin binary]]
-that it is ready to be installed on a SmoothieBoard via its boot loader.
+[[https://github.com/adamgreen/SDCard/blob/master/bins/SoakTest-Smoothie1.bin?raw=true | SoakTest-Smoothie1.bin binary]]
+that it is ready to be installed on a SmoothieBoard via its boot loader. It is probably enough to just let it run for a
+few minutes on the bulk of your cards to see if it gets any failures. It would be great if you could let it run for an
+extended period of time (ie. overnight) on what you consider to be your most reliable card.
 
 If you encounter failures:
 * Create an issue [[https://github.com/adamgreen/SDCard/issues | here on GitHub]].
@@ -56,23 +60,26 @@ If you encounter failures:
 * Describe the card as best as you can (brand, capacity, etc.)
 * Please note if there is anything out of the ordinary with respect to your Smoothieboard setup.
 
-Even if you don't encounter any failures, it would be great if you could also add the serial output from your successful
-runs to [[https://github.com/adamgreen/SDCard/issues/1 | this GitHub issue]].
+I have already hit an issue with a ADATA 8GB uSD card that I have here. The failure is documented in
+[[https://github.com/adamgreen/SDCard/issues/8 | this GitHub issue]].
 
 Thanks for your help! I really appreciate it!
 
-Example output when run on a **ADATA 8GB microSDHC Card Speed Class 4 (40 MB/sec)** card:
+Example output when run on a **SanDisk Mobile Ultra 16GB MicroSD HC I** card:
 {{{
+SDCard Soak Test
 Cleanup from previous test run.
+
+How large should the test file be in MB (100MB is default):
 Dumping SD CID register contents.
-  CID = 0x1D 0x41 0x44 0x53 0x44 0x20 0x20 0x20 0x02 0xB6 0x54 0x59 0x30 0x00 0xF2 0xB3
-          Manufacturer ID: 0x1D
-                   OEM ID: AD
-             Product Name: SD
-         Product Revision: 0.2
-    Product Serial Number: 0xB6545930
-       Manufacturing Date: February 2015
-                 Checksum: 0x59
+  CID = 0x03 0x53 0x44 0x53 0x55 0x31 0x36 0x47 0x80 0x13 0x51 0xB0 0xF7 0x00 0xBB 0x6D
+          Manufacturer ID: 0x03
+                   OEM ID: SD
+             Product Name: SU16G
+         Product Revision: 8.0
+    Product Serial Number: 0x1351B0F7
+       Manufacturing Date: November 2011
+                 Checksum: 0x36
 Dumping SD OCR register contents.
   OCR = 0xC0FF8000
           Card Power Up Status: 1
@@ -89,7 +96,7 @@ Dumping SD OCR register contents.
                     3.4 - 3.5V: 1
                     3.5 - 3.6V: 1
 Dumping SD CSD register contents.
-  CSD = 0x40 0x0E 0x00 0x32 0x5B 0x59 0x00 0x00 0x3A 0xDD 0x7F 0x80 0x0A 0x40 0x00 0xA9
+  CSD = 0x40 0x0E 0x00 0x32 0x5B 0x59 0x00 0x00 0x76 0xB2 0x7F 0x80 0x0A 0x40 0x40 0x13
     CSD Version: 2.0
                   Data Read Access-Time: 0x0E (1ms)
     Data Read Access-Time in CLK cycles: 0
@@ -111,7 +118,7 @@ Dumping SD CSD register contents.
                Write Block Misalignment: no
                 Read Block Misalignment: no
                         DSR Implemented: no
-                            Device Size: 7715840 bytes
+                            Device Size: 15931539456 bytes
               Erase Single Block Enable: 512 bytes
         Erase Sector Size (SECTOR_SIZE): 128
                Write Protect Group Size: 0
@@ -120,85 +127,20 @@ Dumping SD CSD register contents.
             Max Write Data Block Length: 512
        Partial Blocks for Write Allowed: no
                       File Format Group: 0
-                              Copy Flag: original
+                              Copy Flag: copy
              Permanent Write Protection: 0
              Temporary Write Protection: 0
                             File Format: 0
-                                    CRC: 0x54
-Performing write test of 10485760 bytes...
-    1.73 MB/second.
-Performing read test of 10485760 bytes...
-    1.68 MB/second.
-Validating data on disk.
-Validated 10485760 bytes.
+                                    CRC: 0x09
+Creating 10 MB test file...
+The following soak test will run until you press a key to stop it.
+LED1 will blink while the test is progressing smoothly.
+Starting soak test now...
 Removing test file.
 SD Card Driver Counters
-    maximumWaitWhileBusyTime = 96
-    maximumWaitForR1ResponseLoopCount = 1
-    maximumACMD41LoopTime = 1
-    maximumReceiveDataBlockWaitTime = 1
-    cmd12PaddingByteRequiredCount = 1252
+    maximumWaitWhileBusyTime = 23
+    maximumWaitForR1ResponseLoopCount = 2
+    maximumACMD41LoopTime = 13
+    cmd12PaddingByteRequiredCount = 13011
 Test Completed!
 }}}
-
-
-
-==PerformanceTest Results
-===Throughput Measurements
-|= Card                                   |= Manufacturing Date |= Write Speed (MB/s) |= Read Speed (MB/s) |
-| SanDisk Ultra 32GB microSD HC I Class 1 | December 2012       | 1.61                | 1.68               |
-| SanDisk Mobile Ultra 16GB MicroSD HC I  | November 2011       | 1.74                | 1.64               |
-| ADATA 8GB microSDHC Card Speed Class 4  | February 2015       | 1.54                | 1.67               |
-| SanDisk 2GB MicroSD - SDSC              | August 2007         | 1.19                | 1.10               |
-| Wolfman #1 - PH 4 GB                    | January 2014        | 0.85                | 1.64               |
-| Wolfman #2 - TM 8 GB                    | April 2015          | 1.60                | 1.55               |
-| SanDisk 4GB                             | March 2014          | 1.77                | 1.64               |
-| Adata 8GB                               | February 2015       | 1.74                | 1.66               |
-| Kingston 2GB                            | September 2008      | 1.59                | 1.64               |
-| Sandisk 1GB                             | January 2007        | 1.76                | 1.64               |
-
-===Extra SPI Exchanges
-There were some places in ChaN's code which performed an extra SPI byte transfer in the select() code path and after
-issuing a CMD12 command. I didn't see anything in the SD specification which called these out explicitly so I kept them
-in my version and added instrumentation to count when they most likely were required. The following table shows those
-counts. Based on these results it looks like they are most likely required and I can now remove the instrumentation.
-
-|= Card                                   |= selectFirstExchangeRequiredCount |= cmd12PaddingByteRequiredCount |
-| SanDisk Ultra 32GB microSD HC I Class 1 | 1004                              | 1004                           |
-| SanDisk Mobile Ultra 16GB MicroSD HC I  | 1280                              | 1280                           |
-| ADATA 8GB microSDHC Card Speed Class 4  |                                   | 1252                           |
-| SanDisk 2GB MicroSD - SDSC              | 5120                              | 5120                           |
-| Wolfman #1 - PH 4 GB                    | 1134                              | 1134                           |
-| Wolfman #2 - TM 8 GB                    | 1278                              | 1278                           |
-| SanDisk 4GB                             | 1280                              | 1280                           |
-| Adata 8GB                               |                                   | 1246                           |
-| Kingston 2GB                            |                                   | 1278                           |
-| Sandisk 1GB                             | 1280                              | 1280                           |
-
-===Wait Times
-There are some places that the code loops waiting for the card to respond. The following table shows that the cards
-tested are way within the limits used by the current code:\\
-**waitWhileBusyTime:** 500ms\\
-**R1 Response:** 10 iterations\\
-**ACMD41 Wait Time:** 1000ms\\
-**ReceiveDataBlockWaitTime:** 500ms\\
-
-|= Card                                   |= waitWhileBusyTime (ms) |= R1ResponseLoopCount |= ACMD41WaitTime (ms) |= ReceiveDataBlockWaitTime (ms) |
-| SanDisk Ultra 32GB microSD HC I Class 1 | 14                      | 2                    | 5                    |                                |
-| SanDisk Mobile Ultra 16GB MicroSD HC I  | 93                      | 2                    | 15                   | 2                              |
-| ADATA 8GB microSDHC Card Speed Class 4  | 96                      | 1                    | 1                    | 1                              |
-| SanDisk 2GB MicroSD - SDSC              | 21                      | 2                    | 3                    | 1                              |
-| Wolfman #1 - PH 4 GB                    | 145                     | 1                    | 1                    |                                |
-| Wolfman #2 - TM 8 GB                    | 33                      | 2                    | 22                   | 2                              |
-| SanDisk 4GB                             | 54                      | 2                    | 22                   |                                |
-| Adata 8GB                               | 15                      | 1                    | 1                    | 1                              |
-| Kingston 2GB                            | 174                     | 2                    | 62                   |                                |
-| Sandisk 1GB                             | 76                      | 2                    | 3                    | 1                              |
-
-===Retries
-There is code in the driver to retry in certain failure scenarios:
-* CRC errors on sent commands
-* Errors when reading block data
-* Errors when writing block data
-
-The counters for all of these retries was 0 on the cards tested so far.
