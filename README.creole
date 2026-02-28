@@ -1,4 +1,6 @@
-==How to Clone
+This project is no longer under active development.
+
+ ==How to Clone
 This project uses submodules (ie. GCC4MBED and CppUTest).  Cloning therefore requires an extra flag to get all of the
 necessary code.
 
